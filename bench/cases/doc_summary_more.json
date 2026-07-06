@@ -1,0 +1,27 @@
+[
+  {
+    "id": "doc-append-unrelated",
+    "category": "doc_summary",
+    "question": "Summarize the passage above in three bullet points.",
+    "expect_new": ["oxygen"],
+    "context_old": "Photosynthesis converts light energy into chemical energy stored in glucose. It occurs in the chloroplasts of plant cells. The process releases oxygen as a byproduct, which most life on Earth depends on.",
+    "context_new": "Photosynthesis converts light energy into chemical energy stored in glucose. It occurs in the chloroplasts of plant cells. The process releases oxygen as a byproduct, which most life on Earth depends on. The reactions split into light-dependent and light-independent stages."
+  },
+  {
+    "id": "doc-fix-punctuation",
+    "category": "doc_summary",
+    "question": "Summarize the passage above in three bullet points.",
+    "expect_new": ["oxygen"],
+    "context_old": "Photosynthesis converts light energy into chemical energy stored in glucose. It occurs in the chloroplasts of plant cells. The process releases oxygen as a byproduct, which most life on Earth depends on.",
+    "context_new": "Photosynthesis converts light energy into chemical energy stored in glucose; it occurs in the chloroplasts of plant cells. The process releases oxygen as a byproduct, which most life on Earth depends on."
+  },
+  {
+    "id": "doc-change-key-fact",
+    "category": "doc_summary",
+    "question": "Summarize the passage above in three bullet points.",
+    "expect_new": ["carbon dioxide"],
+    "forbid_new": ["releases oxygen"],
+    "context_old": "Photosynthesis converts light energy into chemical energy stored in glucose. It occurs in the chloroplasts of plant cells. The process releases oxygen as a byproduct, which most life on Earth depends on.",
+    "context_new": "Photosynthesis converts light energy into chemical energy stored in glucose. It occurs in the chloroplasts of plant cells. The process consumes oxygen and releases carbon dioxide as a byproduct."
+  }
+]

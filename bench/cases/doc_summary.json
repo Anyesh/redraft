@@ -1,0 +1,26 @@
+[
+  {
+    "id": "doc-typo-fix",
+    "category": "doc_summary",
+    "question": "Summarize the passage above in three bullet points.",
+    "expect_new": ["1960s"],
+    "context_old": "The Aral Sea was once the fourth-largest lake in the world. Soviet irrigation projects diverted its feeder rivers in the 1960s. By 2007 it had shrunk to a tenth of its original size, leaving behind a salt desert and a collapsed fishing industry.",
+    "context_new": "The Aral Sea was once the fourth largest lake in the world. Soviet irrigation projects diverted its feeder rivers in the 1960s. By 2007 it had shrunk to a tenth of its original size, leaving behind a salt desert and a collapsed fishing industry."
+  },
+  {
+    "id": "doc-append-sentence",
+    "category": "doc_summary",
+    "question": "Summarize the passage above in three bullet points.",
+    "expect_new": ["dam"],
+    "context_old": "The Aral Sea was once the fourth-largest lake in the world. Soviet irrigation projects diverted its feeder rivers in the 1960s. By 2007 it had shrunk to a tenth of its original size, leaving behind a salt desert and a collapsed fishing industry.",
+    "context_new": "The Aral Sea was once the fourth-largest lake in the world. Soviet irrigation projects diverted its feeder rivers in the 1960s. By 2007 it had shrunk to a tenth of its original size, leaving behind a salt desert and a collapsed fishing industry. A 2005 dam has since partially restored the northern basin."
+  },
+  {
+    "id": "doc-reword-middle",
+    "category": "doc_summary",
+    "question": "Summarize the passage above in three bullet points.",
+    "expect_new": ["cotton"],
+    "context_old": "The Aral Sea was once the fourth-largest lake in the world. Soviet irrigation projects diverted its feeder rivers in the 1960s. By 2007 it had shrunk to a tenth of its original size, leaving behind a salt desert and a collapsed fishing industry.",
+    "context_new": "The Aral Sea was once the fourth-largest lake in the world. Cotton irrigation schemes drained its two feeder rivers starting in the 1960s. By 2007 it had shrunk to a tenth of its original size, leaving behind a salt desert and a collapsed fishing industry."
+  }
+]

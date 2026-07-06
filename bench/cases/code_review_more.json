@@ -1,0 +1,27 @@
+[
+  {
+    "id": "code-reformat-whitespace",
+    "category": "code_review",
+    "question": "Review this function for correctness bugs. Be concise.",
+    "expect_new": ["correct"],
+    "context_old": "def dedupe(items):\n    seen = set()\n    out = []\n    for x in items:\n        if x not in seen:\n            seen.add(x)\n            out.append(x)\n    return out",
+    "context_new": "def dedupe(items):\n    seen = set()\n    out = []\n    for x in items:\n        if x not in seen:\n            seen.add(x)\n\n            out.append(x)\n    return out"
+  },
+  {
+    "id": "code-add-typehints",
+    "category": "code_review",
+    "question": "Review this function for correctness bugs. Be concise.",
+    "expect_new": ["correct"],
+    "context_old": "def dedupe(items):\n    seen = set()\n    out = []\n    for x in items:\n        if x not in seen:\n            seen.add(x)\n            out.append(x)\n    return out",
+    "context_new": "def dedupe(items: list) -> list:\n    seen: set = set()\n    out: list = []\n    for x in items:\n        if x not in seen:\n            seen.add(x)\n            out.append(x)\n    return out"
+  },
+  {
+    "id": "code-break-logic",
+    "category": "code_review",
+    "question": "Review this function for correctness bugs. Be concise.",
+    "expect_new": ["bug"],
+    "forbid_new": ["is correct", "No bugs", "no bugs"],
+    "context_old": "def dedupe(items):\n    seen = set()\n    out = []\n    for x in items:\n        if x not in seen:\n            seen.add(x)\n            out.append(x)\n    return out",
+    "context_new": "def dedupe(items):\n    seen = set()\n    out = []\n    for x in items:\n        if x in seen:\n            seen.add(x)\n            out.append(x)\n    return out"
+  }
+]

@@ -1,0 +1,167 @@
+[
+ {
+  "id": "code-rename-var",
+  "old": "The function is **correct**.\n\n- It properly handles both odd and even lengths.\n- `sorted(xs)` creates a new sorted list, leaving the original unchanged.\n- Indexing `s[mid]` for odd `n` and `(s[mid-1] + s[mid]) / 2` for even `n` is accurate.\n- No edge cases (e.g., empty list) are handled, but that\u2019s typically expected behavior (raises `IndexError`), not a bug in logic.",
+  "new_free": "The function is **correct**. It properly handles both odd and even-length lists by sorting the input, finding the middle index, and returning the median element (odd) or the average of the two middle elements (even). No bugs detected.",
+  "new_free_correct": "",
+  "stabilized": {
+   "0.0": "The function is **correct**. It properly handles both odd and even-length lists by sorting the input, finding the middle index, and returning the median element (odd) or the average of the two middle elements (even). No bugs detected.",
+   "1.5": "The function is **correct**.\n\n- It properly handles both odd and even lengths.\n- `sorted(values)` creates a new sorted list, leaving the original unchanged.\n- Indexing `s[mid]` for odd `n` and `(s[mid-1] + s[mid]) / 2` for even `n` is accurate.\n- No edge cases (e.g., empty list) are handled, but that\u2019s typically expected behavior (raises `IndexError`), not a bug in logic.",
+   "3.0": "The function is **correct**.\n\n- It properly handles both odd and even lengths.\n- `sorted(values)` creates a new sorted list, leaving the original unchanged.\n- Indexing `s[mid]` for odd `n` and `(s[mid-1] + s[mid]) / 2` for even `n` is accurate.\n- No edge cases (e.g., empty list) are handled, but that\u2019s typically expected behavior (raises `IndexError`), not a bug in logic."
+  }
+ },
+ {
+  "id": "code-introduce-bug",
+  "old": "The function is **correct**.\n\n- It properly handles both odd and even lengths.\n- `sorted(xs)` creates a new sorted list, leaving the original unchanged.\n- Indexing `s[mid]` for odd `n` and `(s[mid-1] + s[mid]) / 2` for even `n` is accurate.\n- No edge cases (e.g., empty list) are handled, but that\u2019s typically expected behavior (raises `IndexError`), not a bug in the logic itself.",
+  "new_free": "The function has a correctness bug in the even-length case: it divides by `n` instead of `2`. The median of an even number of elements should be the average of the two middle elements, i.e., `(s[mid - 1] + s[mid]) / 2`, not divided by `n`.",
+  "new_free_correct": "",
+  "stabilized": {
+   "0.0": "The function has a correctness bug in the even-length case: it divides by `n` instead of `2`. The median of an even number of elements should be the average of the two middle elements, i.e., `(s[mid - 1] + s[mid]) / 2`, not divided by `n`.",
+   "1.5": "The function has a correctness bug in the even-length case: it divides by `n` instead of `2`. The median of an even number of elements should be the average of the two middle elements, i.e., `(s[mid - 1] + s[mid]) / 2`, not divided by `n`.",
+   "3.0": "The function is **correct**.\n\n- It properly handles both odd and even lengths.\n- `sorted(xs)` creates a new sorted list, leaving the original unchanged.\n- Indexing `s[mid]` for odd `n` and `(s[mid-1] + s[mid]) / 2` for even `n` is standard.\n- **Note**: The division by `n` in the even case should be `2`, not `n`. Wait\u2014let me re-read: `return (s[mid - 1] + s[mid]) / n`. This is **incorrect**. It should be `/ 2`, not `/ n`.\n\n**Bug**: The even-length case divides by `n` instead of `2`."
+  }
+ },
+ {
+  "id": "code-add-guard",
+  "old": "The function is **correct**.\n\n- It properly handles both odd and even lengths.\n- `sorted(xs)` creates a new sorted list, leaving the original unchanged.\n- Indexing `s[mid]` for odd `n` and `(s[mid-1] + s[mid]) / 2` for even `n` is accurate.\n- No edge cases (e.g., empty list) are handled, but that\u2019s typically expected behavior (raises `IndexError`), not a bug in logic.",
+  "new_free": "The function is **correct**.\n\n- Handles empty input with a `ValueError`.\n- Correctly sorts the input.\n- Correctly computes the median for both odd and even lengths.\n- Uses integer division (`//`) appropriately.\n- Returns a float for even-length lists (standard behavior).\n\nNo bugs found.",
+  "new_free_correct": "",
+  "stabilized": {
+   "0.0": "The function is **correct**.\n\n- Handles empty input with a `ValueError`.\n- Correctly sorts the input.\n- Correctly computes the median for both odd and even lengths.\n- Uses integer division (`//`) appropriately.\n- Returns a float for even-length lists (standard behavior).\n\nNo bugs found.",
+   "1.5": "The function is **correct**.\n\n- It handles empty input by raising `ValueError`.\n- It correctly sorts the input.\n- It correctly computes the median for both odd and even lengths.\n- For even lengths, it returns the average of the two middle elements as a float (Python 3 behavior).\n\nNo bugs found.",
+   "3.0": "The function is **correct**.\n\n- It properly handles empty input by raising `ValueError`.\n- It correctly sorts the input.\n- It correctly computes the median for both odd and even lengths.\n- For even lengths, it returns the average of the two middle elements as a float (Python 3 behavior).\n\nNo bugs found."
+  }
+ },
+ {
+  "id": "code-reformat-whitespace",
+  "old": "The function is correct. It successfully removes duplicates while preserving the original order of first occurrences.",
+  "new_free": "The function is **correct**. It successfully removes duplicates while preserving the original order of first occurrences.\n\n**Note:** This approach only works if `items` contains **hashable** elements. If unhashable types (e.g., lists, dicts) are present, it will raise a `TypeError`.",
+  "new_free_correct": "",
+  "stabilized": {
+   "0.0": "The function is **correct**. It successfully removes duplicates while preserving the original order of first occurrences.\n\n**Note:** This approach only works if `items` contains **hashable** elements. If unhashable types (e.g., lists, dicts) are present, it will raise a `TypeError`.",
+   "1.5": "The function is correct. It successfully removes duplicates while preserving the original order of first occurrences.",
+   "3.0": "The function is correct. It successfully removes duplicates while preserving the original order of first occurrences."
+  }
+ },
+ {
+  "id": "code-add-typehints",
+  "old": "The function is correct. It successfully removes duplicates while preserving the original order of first occurrences.",
+  "new_free": "No correctness bugs. The function correctly removes duplicates while preserving order.",
+  "new_free_correct": "",
+  "stabilized": {
+   "0.0": "No correctness bugs. The function correctly removes duplicates while preserving order.",
+   "1.5": "The function is correct. It efficiently removes duplicates while preserving the original order of first occurrences.",
+   "3.0": "The function is correct. It successfully removes duplicates while preserving the original order of first occurrences."
+  }
+ },
+ {
+  "id": "code-break-logic",
+  "old": "The function is correct. It successfully removes duplicates while preserving the original order of first occurrences.",
+  "new_free": "The function has a logic bug: it appends `x` to `out` only when `x` is **already** in `seen`, which means it returns duplicates instead of unique items. It should append when `x` is **not** in `seen`, then add `x` to `seen`.",
+  "new_free_correct": "",
+  "stabilized": {
+   "0.0": "The function has a logic bug: it appends `x` to `out` only when `x` is **already** in `seen`, which means it returns duplicates instead of unique items. It should append when `x` is **not** in `seen`, then add `x` to `seen`.",
+   "1.5": "The function is incorrect. The logic is inverted: it should check `if x not in seen` to add new items, and `seen.add(x)` should happen regardless of whether it's a duplicate or not. Currently, it only adds items that are already in `seen` (which is always false on first encounter), resulting in an empty list.",
+   "3.0": "The function is incorrect. The logic is inverted: it should check `if x not in seen` to add new items, and `seen.add(x)` should happen regardless of whether it's a duplicate or not. Currently, it only adds items that are already in `seen` (which is always false on first encounter), resulting in an empty list."
+  }
+ },
+ {
+  "id": "doc-typo-fix",
+  "old": "*   The Aral Sea was historically the fourth-largest lake in the world.\n*   Soviet irrigation projects diverted the river systems feeding the lake starting in the 1960s.\n*   By 2007, the lake had shrunk to one-tenth of its original size, resulting in a salt desert and the collapse of the fishing industry.",
+  "new_free": "*   The Aral Sea was historically the fourth largest lake in the world before undergoing drastic changes due to human intervention.\n*   In the 1960s, Soviet irrigation projects diverted the rivers that fed the lake, causing it to shrink to one-tenth of its original size by 2007.\n*   This environmental collapse resulted in the formation of a salt desert and the complete failure of the local fishing industry.",
+  "new_free_correct": "",
+  "stabilized": {
+   "0.0": "*   The Aral Sea was historically the fourth largest lake in the world before undergoing drastic changes due to human intervention.\n*   In the 1960s, Soviet irrigation projects diverted the rivers that fed the lake, causing it to shrink to one-tenth of its original size by 2007.\n*   This environmental collapse resulted in the formation of a salt desert and the complete failure of the local fishing industry.",
+   "1.5": "*   The Aral Sea was historically the fourth largest lake in the world.\n*   Soviet irrigation projects diverted the river systems feeding the lake starting in the 1960s.\n*   By 2007, the lake had shrunk to one-tenth of its original size, resulting in a salt desert and the collapse of the fishing industry.",
+   "3.0": "*   The Aral Sea was historically the fourth-largest lake in the world.\n*   Soviet irrigation projects diverted the river systems feeding the lake starting in the 1960s.\n*   By 2007, the lake had shrunk to one-tenth of its original size, resulting in a salt desert and the collapse of the fishing industry."
+  }
+ },
+ {
+  "id": "doc-append-sentence",
+  "old": "*   The Aral Sea was historically the fourth-largest lake in the world.\n*   Soviet irrigation projects diverted the river systems feeding the lake starting in the 1960s.\n*   By 2007, the lake had shrunk to one-tenth of its original size, resulting in a salt desert and the collapse of the fishing industry.",
+  "new_free": "*   The Aral Sea, formerly the world's fourth-largest lake, was severely impacted by Soviet irrigation projects in the 1960s that diverted its feeder rivers.\n*   By 2007, the lake had shrunk to one-tenth of its original size, resulting in a salt desert and the collapse of the local fishing industry.\n*   A dam constructed in 2005 has helped to partially restore the northern basin of the sea.",
+  "new_free_correct": "",
+  "stabilized": {
+   "0.0": "*   The Aral Sea, formerly the world's fourth-largest lake, was severely impacted by Soviet irrigation projects in the 1960s that diverted its feeder rivers.\n*   By 2007, the lake had shrunk to one-tenth of its original size, resulting in a salt desert and the collapse of the local fishing industry.\n*   A dam constructed in 2005 has helped to partially restore the northern basin of the sea.",
+   "1.5": "*   The Aral Sea, formerly the world's fourth-largest lake, was severely impacted by Soviet irrigation projects in the 1960s that diverted its feeder rivers.\n*   By 2007, the lake had shrunk to one-tenth of its original size, resulting in a salt desert and the collapse of the local fishing industry.\n*   A dam constructed in 2005 has helped to partially restore the northern basin of the sea.",
+   "3.0": "*   The Aral Sea was historically the fourth-largest lake in the world before Soviet irrigation projects diverted its feeder rivers starting in the 1960s.\n*   By 2007, the lake had shrunk to one-tenth of its original size, resulting in a salt desert and the collapse of the fishing industry.\n*   A dam constructed in 2005 has helped partially restore the northern basin of the sea."
+  }
+ },
+ {
+  "id": "doc-reword-middle",
+  "old": "*   The Aral Sea was historically the fourth-largest lake in the world.\n*   Soviet irrigation projects diverted the river systems feeding the lake starting in the 1960s.\n*   By 2007, the lake had shrunk to one-tenth of its original size, resulting in a salt desert and the collapse of the fishing industry.",
+  "new_free": "*   The Aral Sea was historically the fourth-largest lake in the world before undergoing drastic environmental changes.\n*   Starting in the 1960s, extensive cotton irrigation schemes diverted the waters of its two feeder rivers, causing the lake to shrink to one-tenth of its original size by 2007.\n*   This massive reduction in water volume resulted in the formation of a salt desert and the complete collapse of the local fishing industry.",
+  "new_free_correct": "",
+  "stabilized": {
+   "0.0": "*   The Aral Sea was historically the fourth-largest lake in the world before undergoing drastic environmental changes.\n*   Starting in the 1960s, extensive cotton irrigation schemes diverted the waters of its two feeder rivers, causing the lake to shrink to one-tenth of its original size by 2007.\n*   This massive reduction in water volume resulted in the formation of a salt desert and the complete collapse of the local fishing industry.",
+   "1.5": "*   The Aral Sea was historically the fourth-largest lake in the world.\n*   Extensive cotton irrigation schemes diverted the lake's feeder rivers starting in the 1960s.\n*   By 2007, the lake had shrunk to one-tenth of its original size, resulting in a salt desert and the collapse of the fishing industry.",
+   "3.0": "*   The Aral Sea was historically the fourth-largest lake in the world.\n*   Extensive cotton irrigation schemes diverted the lake's feeder rivers starting in the 1960s.\n*   By 2007, the lake had shrunk to one-tenth of its original size, resulting in a salt desert and the collapse of the fishing industry."
+  }
+ },
+ {
+  "id": "doc-append-unrelated",
+  "old": "*   Photosynthesis transforms light energy into chemical energy, storing it in the form of glucose.\n*   This process takes place within the chloroplasts of plant cells.\n*   Oxygen is released as a byproduct, serving as a vital resource for most life on Earth.",
+  "new_free": "*   Photosynthesis transforms light energy into chemical energy stored in glucose within the chloroplasts of plant cells.\n*   The process releases oxygen as a byproduct, which is essential for the survival of most life on Earth.\n*   The reactions are divided into two distinct stages: light-dependent and light-independent reactions.",
+  "new_free_correct": "",
+  "stabilized": {
+   "0.0": "*   Photosynthesis transforms light energy into chemical energy stored in glucose within the chloroplasts of plant cells.\n*   The process releases oxygen as a byproduct, which is essential for the survival of most life on Earth.\n*   The reactions are divided into two distinct stages: light-dependent and light-independent reactions.",
+   "1.5": "*   Photosynthesis transforms light energy into chemical energy, storing it in glucose within plant chloroplasts.\n*   Oxygen is released as a byproduct of this process, serving as a vital resource for most life on Earth.\n*   The overall reaction is divided into two distinct phases: light-dependent and light-independent stages.",
+   "3.0": "*   Photosynthesis transforms light energy into chemical energy, storing it in the form of glucose.\n*   This process takes place within the chloroplasts of plant cells.\n*   Oxygen is released as a byproduct, serving as a vital resource for most life on Earth."
+  }
+ },
+ {
+  "id": "doc-fix-punctuation",
+  "old": "*   Photosynthesis transforms light energy into chemical energy, storing it in the form of glucose.\n*   This process takes place within the chloroplasts of plant cells.\n*   Oxygen is released as a byproduct, serving as a vital resource for most life on Earth.",
+  "new_free": "*   Photosynthesis transforms light energy into chemical energy, storing it in the form of glucose.\n*   This process takes place within the chloroplasts of plant cells.\n*   Oxygen is released as a byproduct, serving as a vital resource for most life on Earth.",
+  "new_free_correct": "",
+  "stabilized": {
+   "0.0": "*   Photosynthesis transforms light energy into chemical energy, storing it in the form of glucose.\n*   This process takes place within the chloroplasts of plant cells.\n*   Oxygen is released as a byproduct, serving as a vital resource for most life on Earth.",
+   "1.5": "*   Photosynthesis transforms light energy into chemical energy, storing it in the form of glucose.\n*   This process takes place within the chloroplasts of plant cells.\n*   Oxygen is released as a byproduct, serving as a vital resource for most life on Earth.",
+   "3.0": "*   Photosynthesis transforms light energy into chemical energy, storing it in the form of glucose.\n*   This process takes place within the chloroplasts of plant cells.\n*   Oxygen is released as a byproduct, serving as a vital resource for most life on Earth."
+  }
+ },
+ {
+  "id": "doc-change-key-fact",
+  "old": "*   Photosynthesis transforms light energy into chemical energy, storing it in the form of glucose.\n*   This process takes place within the chloroplasts of plant cells.\n*   Oxygen is released as a byproduct, serving as a vital resource for most life on Earth.",
+  "new_free": "*   Photosynthesis transforms light energy into chemical energy, which is stored in glucose.\n*   This process takes place within the chloroplasts of plant cells.\n*   The passage states that the process consumes oxygen and releases carbon dioxide as a byproduct.",
+  "new_free_correct": "pass",
+  "stabilized": {
+   "0.0": "*   Photosynthesis transforms light energy into chemical energy, which is stored in glucose.\n*   This process takes place within the chloroplasts of plant cells.\n*   The passage states that the process consumes oxygen and releases carbon dioxide as a byproduct.",
+   "1.5": "*   Photosynthesis transforms light energy into chemical energy, storing it in the form of glucose.\n*   This process takes place within the chloroplasts of plant cells.\n*   The passage states that the process consumes oxygen and releases carbon dioxide as a byproduct.",
+   "3.0": "*   Photosynthesis transforms light energy into chemical energy, storing it in the form of glucose.\n*   This process takes place within the chloroplasts of plant cells.\n*   The passage states that the process consumes oxygen and releases carbon dioxide as a byproduct."
+  }
+ },
+ {
+  "id": "fact-irrelevant-row",
+  "old": "Based on the table provided:\n\n1.  **India** has a population of **1428** million.\n2.  **China** has a population of **1425** million.\n3.  **United States** has a population of **340** million.\n4.  **Indonesia** has a population of **277** million.\n\nThe country with the largest population is **India**.\n\nThe capital of India is **New Delhi**.",
+  "new_free": "Based on the table provided:\n\n1.  **India** has the largest population at **1428 million**.\n2.  The capital of India is **New Delhi**.\n\nTherefore, the capital of the country with the largest population is **New Delhi**.",
+  "new_free_correct": "pass",
+  "stabilized": {
+   "0.0": "Based on the table provided:\n\n1.  **India** has the largest population at **1428 million**.\n2.  The capital of India is **New Delhi**.\n\nTherefore, the capital of the country with the largest population is **New Delhi**.",
+   "1.5": "Based on the table provided:\n\n1.  **India** has a population of **1428** million.\n2.  **China** has a population of **1425** million.\n3.  **United States** has a population of **340** million.\n4.  **Indonesia** has a population of **277** million.\n5.  **Pakistan** has a population of **240** million.\n\nThe country with the largest population is **India**.\n\nThe capital of India is **New Delhi**.",
+   "3.0": "Based on the table provided:\n\n1.  **India** has a population of **1428** million.\n2.  **China** has a population of **1425** million.\n3.  **United States** has a population of **340** million.\n4.  **Indonesia** has a population of **277** million.\n5.  **Pakistan** has a population of **240** million.\n\nThe country with the largest population is **India**.\n\nThe capital of India is **New Delhi**."
+  }
+ },
+ {
+  "id": "fact-answer-changing-edit",
+  "old": "Based on the table provided:\n\n1.  **India** has a population of **1428** million.\n2.  **China** has a population of **1425** million.\n3.  **United States** has a population of **340** million.\n4.  **Indonesia** has a population of **277** million.\n\nThe country with the largest population is **India**.\n\nThe capital of India is **New Delhi**.",
+  "new_free": "Based on the table provided:\n\n1.  **Identify the country with the largest population:**\n    *   India: 1428 million\n    *   China: 1525 million\n    *   United States: 340 million\n    *   Indonesia: 277 million\n\n    **China** has the largest population (1525 million).\n\n2.  **Find the capital of that country:**\n    *   The capital of China is **Beijing**.\n\n**Answer:** Beijing",
+  "new_free_correct": "pass",
+  "stabilized": {
+   "0.0": "Based on the table provided:\n\n1.  **Identify the country with the largest population:**\n    *   India: 1428 million\n    *   China: 1525 million\n    *   United States: 340 million\n    *   Indonesia: 277 million\n\n    **China** has the largest population (1525 million).\n\n2.  **Find the capital of that country:**\n    *   The capital of China is **Beijing**.\n\n**Answer:** Beijing",
+   "1.5": "Based on the table provided:\n\n1.  **India**: 1428 million\n2.  **China**: 1525 million\n3.  **United States**: 340 million\n4.  **Indonesia**: 277 million\n\nThe country with the largest population is **China** (1525 million).\n\nThe capital of China is **Beijing**.",
+   "3.0": "Based on the table provided:\n\n1.  **India** has a population of **1428** million.\n2.  **China** has a population of **1525** million.\n3.  **United States** has a population of **340** million.\n4.  **Indonesia** has a population of **277** million.\n\nThe country with the largest population is **China** (1525 million).\n\nThe capital of China is **Beijing**."
+  }
+ },
+ {
+  "id": "fact-relabel-column",
+  "old": "Based on the table provided:\n\n1.  **India** has a population of **1428** million.\n2.  **China** has a population of **1425** million.\n3.  **United States** has a population of **340** million.\n4.  **Indonesia** has a population of **277** million.\n\nThe country with the largest population is **India**.\n\nThe capital of India is **New Delhi**.",
+  "new_free": "Based on the table provided:\n\n1.  **India** has a population of **1428** million.\n2.  **China** has a population of **1425** million.\n3.  **United States** has a population of **340** million.\n4.  **Indonesia** has a population of **277** million.\n\nThe country with the largest population is **India** (1428 million).\n\nThe capital city of India is **New Delhi**.",
+  "new_free_correct": "pass",
+  "stabilized": {
+   "0.0": "Based on the table provided:\n\n1.  **India** has a population of **1428** million.\n2.  **China** has a population of **1425** million.\n3.  **United States** has a population of **340** million.\n4.  **Indonesia** has a population of **277** million.\n\nThe country with the largest population is **India** (1428 million).\n\nThe capital city of India is **New Delhi**.",
+   "1.5": "Based on the table provided:\n\n1.  **India** has a population of **1428** million.\n2.  **China** has a population of **1425** million.\n3.  **United States** has a population of **340** million.\n4.  **Indonesia** has a population of **277** million.\n\nThe country with the largest population is **India**.\n\nThe capital city of India is **New Delhi**.",
+   "3.0": "Based on the table provided:\n\n1.  **India** has a population of **1428** million.\n2.  **China** has a population of **1425** million.\n3.  **United States** has a population of **340** million.\n4.  **Indonesia** has a population of **277** million.\n\nThe country with the largest population is **India**.\n\nThe capital of India is **New Delhi**."
+  }
+ }
+]

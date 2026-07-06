@@ -1,0 +1,27 @@
+[
+  {
+    "id": "fact-irrelevant-row",
+    "category": "fact_answer",
+    "question": "What is the capital of the country with the largest population in the table?",
+    "expect_new": ["New Delhi"],
+    "context_old": "Country, Population (millions), Capital\nIndia, 1428, New Delhi\nChina, 1425, Beijing\nUnited States, 340, Washington\nIndonesia, 277, Jakarta",
+    "context_new": "Country, Population (millions), Capital\nIndia, 1428, New Delhi\nChina, 1425, Beijing\nUnited States, 340, Washington\nIndonesia, 277, Jakarta\nPakistan, 240, Islamabad"
+  },
+  {
+    "id": "fact-answer-changing-edit",
+    "category": "fact_answer",
+    "question": "What is the capital of the country with the largest population in the table?",
+    "expect_new": ["Beijing"],
+    "forbid_new": ["New Delhi"],
+    "context_old": "Country, Population (millions), Capital\nIndia, 1428, New Delhi\nChina, 1425, Beijing\nUnited States, 340, Washington\nIndonesia, 277, Jakarta",
+    "context_new": "Country, Population (millions), Capital\nIndia, 1428, New Delhi\nChina, 1525, Beijing\nUnited States, 340, Washington\nIndonesia, 277, Jakarta"
+  },
+  {
+    "id": "fact-relabel-column",
+    "category": "fact_answer",
+    "question": "What is the capital of the country with the largest population in the table?",
+    "expect_new": ["New Delhi"],
+    "context_old": "Country, Population (millions), Capital\nIndia, 1428, New Delhi\nChina, 1425, Beijing\nUnited States, 340, Washington\nIndonesia, 277, Jakarta",
+    "context_new": "Nation, Population (millions), Capital City\nIndia, 1428, New Delhi\nChina, 1425, Beijing\nUnited States, 340, Washington\nIndonesia, 277, Jakarta"
+  }
+]

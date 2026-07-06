@@ -1,0 +1,16 @@
+id,category,old_tokens,new_tokens,accepted_prefix,salvage_r0,salvage_r4,salvage_r16
+code-rename-var,code_review,27,71,6,0.169,0.0845,0.0
+code-introduce-bug,code_review,69,59,2,0.3898,0.1186,0.0
+code-add-guard,code_review,107,67,8,0.3284,0.2388,0.0
+code-reformat-whitespace,code_review,18,61,3,0.2623,0.2131,0.0
+code-add-typehints,code_review,18,13,0,0.5385,0.0,0.0
+code-break-logic,code_review,18,54,2,0.0741,0.0,0.0
+doc-typo-fix,doc_summary,76,85,10,0.6706,0.5412,0.2706
+doc-append-sentence,doc_summary,76,98,6,0.602,0.5,0.3571
+doc-reword-middle,doc_summary,76,76,19,0.9737,0.9737,0.9079
+doc-append-unrelated,doc_summary,57,61,10,0.459,0.3279,0.0
+doc-fix-punctuation,doc_summary,57,57,57,1.0,1.0,1.0
+doc-change-key-fact,doc_summary,57,53,11,0.717,0.6038,0.3962
+fact-irrelevant-row,fact_answer,102,55,14,0.6,0.4909,0.0
+fact-answer-changing-edit,fact_answer,102,113,11,0.177,0.1416,0.0
+fact-relabel-column,fact_answer,102,110,91,0.9182,0.8909,0.8273

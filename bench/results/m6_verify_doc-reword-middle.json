@@ -1,0 +1,28 @@
+{
+  "widths": [
+    1,
+    8,
+    16,
+    32,
+    64
+  ],
+  "verify_ms_median": {
+    "1": 26.619,
+    "8": 80.78800000000001,
+    "16": 132.019,
+    "32": 237.705,
+    "64": 457.60299999999995
+  },
+  "slope_ms_per_token": 6.788370025469596,
+  "intercept_ms": 22.668245383635792,
+  "decode_ms_per_token": 15.418890625,
+  "slope_over_decode": 0.44026319341438325,
+  "port_projection": {
+    "doc_summary": 1.6877306569007624,
+    "fact_answer": 1.82198435288727,
+    "code_review": 1.138981512677184
+  },
+  "verdict": "COMMIT-LEANING: projected in-engine doc_summary 1.69x clears the 1.2x bar; a held draft token costs 0.44x a serial decode, far below what m5's server-only ceiling implied",
+  "case_id": "doc-reword-middle",
+  "base_tokens": 101
+}

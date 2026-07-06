@@ -1,0 +1,29 @@
+[
+  {
+    "id": "fact-metric-threshold-crossed",
+    "category": "fact_answer",
+    "question": "Which service has the highest P99 latency in the table above, and what is it?",
+    "expect_new": ["610"],
+    "forbid_new": ["340"],
+    "context_old": "Service, P99 Latency (ms), Status\nCheckout, 210, OK\nSearch, 340, OK\nAuth, 180, OK",
+    "context_new": "Service, P99 Latency (ms), Status\nCheckout, 210, OK\nSearch, 610, OK\nAuth, 180, OK"
+  },
+  {
+    "id": "fact-ranking-changes",
+    "category": "fact_answer",
+    "question": "Who has the most points in the table above?",
+    "expect_new": ["Noah"],
+    "forbid_new": ["Ava"],
+    "context_old": "Player, Points\nAva, 42\nLiam, 38\nNoah, 35",
+    "context_new": "Player, Points\nAva, 42\nLiam, 38\nNoah, 51"
+  },
+  {
+    "id": "fact-config-value-changed",
+    "category": "fact_answer",
+    "question": "What is the value of max_connections in the configuration above?",
+    "expect_new": ["250"],
+    "forbid_new": ["100"],
+    "context_old": "max_connections = 100\ntimeout_seconds = 30\nretry_limit = 3",
+    "context_new": "max_connections = 250\ntimeout_seconds = 30\nretry_limit = 3"
+  }
+]

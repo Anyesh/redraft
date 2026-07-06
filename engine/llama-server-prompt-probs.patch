@@ -1,0 +1,243 @@
+diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
+index ae9e0bf..af18dd1 100644
+--- a/tools/server/server-context.cpp
++++ b/tools/server/server-context.cpp
+@@ -95,6 +95,12 @@ struct server_slot {
+ 
+     std::vector<completion_token_output> generated_token_probs;
+ 
++    // prompt_probs_tail: records which batch index maps to which target prompt
++    // position during prefill, so logits can be harvested right after the
++    // llama_decode() call that produced them (logits are invalid afterward)
++    std::vector<std::pair<int32_t, int32_t>> prompt_probs_batch_idx; // (i_batch, target prompt pos)
++    std::vector<completion_token_output> prompt_probs_output;
++
+     bool has_next_token = true;
+     bool has_new_line   = false;
+     bool truncated      = false;
+@@ -200,6 +206,8 @@ struct server_slot {
+         }
+         generated_tokens.clear();
+         generated_token_probs.clear();
++        prompt_probs_batch_idx.clear();
++        prompt_probs_output.clear();
+         json_schema = json();
+ 
+         // clear speculative decoding stats
+@@ -1700,6 +1708,42 @@ private:
+         }
+     }
+ 
++    // builds a completion_token_output describing the model's predicted distribution
++    // at prompt position idx (a batch-relative logits index) for a KNOWN target token
++    // (a prompt token, never sampled); mirrors populate_token_probs()'s non-post-sampling
++    // branch exactly, but the target token is given (there is no sampler candidate list
++    // for prompt positions), so probability lookup happens directly against the sorted
++    // logit distribution returned by get_token_probabilities()
++    completion_token_output make_prompt_prob_output(const server_slot & slot, llama_token target_tok, int idx) const {
++        completion_token_output result;
++        result.tok          = target_tok;
++        result.text_to_send = common_token_to_piece(ctx_tgt, target_tok, params_base.special);
++
++        const size_t n_probs_request = slot.task->params.sampling.n_probs;
++
++        std::vector<llama_token_data> cur = get_token_probabilities(ctx_tgt, idx);
++        const size_t max_probs = cur.size();
++        const size_t n_probs = std::min(max_probs, n_probs_request);
++
++        for (size_t i = 0; i < max_probs; i++) {
++            if (cur[i].id == target_tok) {
++                result.prob = cur[i].p;
++                break;
++            }
++        }
++
++        result.probs.reserve(n_probs);
++        for (size_t i = 0; i < n_probs; i++) {
++            result.probs.push_back({
++                cur[i].id,
++                common_token_to_piece(ctx_tgt, cur[i].id, params_base.special),
++                cur[i].p
++            });
++        }
++
++        return result;
++    }
++
+     void send_error(const server_task & task, const std::string & error, const enum error_type type = ERROR_TYPE_SERVER) {
+         send_error(task.id, error, type);
+     }
+@@ -1832,6 +1876,9 @@ private:
+             }
+         }
+ 
++        // populate res.prompt_probs_output (prompt_probs_tail)
++        res->prompt_probs_output = std::move(slot.prompt_probs_output);
++
+         res->generation_params = slot.task->params; // copy the parameters
+ 
+         queue_results.send(std::move(res));
+@@ -2713,6 +2760,26 @@ private:
+                                 n_past = 0;
+                             }
+ 
++                            // prompt_probs_tail needs fresh logits at the predictor positions for the
++                            // last N target tokens, which means n_past may have to be forced down below
++                            // whatever cache-prefix matching just found. This must happen here, before
++                            // pos_next/pos_min_thold are derived from n_past and used to pick a context
++                            // checkpoint (or a full reset) below: on plain transformer KV caches, dropping
++                            // cells at an arbitrary p0 is always safe, but on recurrent/hybrid memory
++                            // (e.g. Gated DeltaNet layers) the accumulated state can only be rewound by a
++                            // small speculative-decoding snapshot budget (see llama_n_rs_seq / the
++                            // COMMON_CONTEXT_SEQ_RM_TYPE_RS handling elsewhere in this file), which is 0
++                            // for a server run without a draft model. Clamping after the checkpoint
++                            // search (as a prior version of this code did) left the checkpoint machinery
++                            // reconciling against the pre-clamp n_past, so it would restore/keep KV state
++                            // at a position the later trim then couldn't safely roll back from -- clamping
++                            // first lets the existing checkpoint-or-reset logic below pick a state that is
++                            // actually consistent with the lowered n_past.
++                            if (slot.task->params.prompt_probs_tail > 0) {
++                                const int32_t n_tail = slot.task->params.prompt_probs_tail;
++                                n_past = std::min(n_past, std::max(0, slot.task->n_tokens() - n_tail - 1));
++                            }
++
+                             llama_pos pos_next = slot.prompt.tokens.pos_next(n_past);
+ 
+                             // the largest pos_min required for a checkpoint to be useful
+@@ -2923,6 +2990,19 @@ private:
+                     const int32_t n_before_user = slot.task->params.n_before_user;
+                     const bool n_before_user_known = n_before_user > 0;
+ 
++                    // prompt_probs_tail: figure out which predictor positions need their logits
++                    // flagged. Target positions are the last N prompt tokens: [n_tokens_task - N, n_tokens_task - 1].
++                    // Token at absolute position p is predicted by the logits produced when the
++                    // token at position p-1 is fed through the model, so the positions we must flag
++                    // are [n_tokens_task - N - 1, n_tokens_task - 2] (one less on both ends).
++                    // Position 0 can never be a target: there is no position -1 to predict it from,
++                    // so N is clamped to n_tokens_task - 1 (see also the N >= prompt length test case).
++                    const int32_t n_tokens_task    = slot.task->n_tokens();
++                    const int32_t n_tail_requested = slot.task->params.prompt_probs_tail;
++                    const int32_t n_tail_eff       = std::max(0, std::min(n_tail_requested, n_tokens_task - 1));
++                    const int32_t pos_tail_lo       = n_tokens_task - n_tail_eff - 1; // inclusive
++                    const int32_t pos_tail_hi       = n_tokens_task - 2;              // inclusive (empty range when n_tail_eff == 0)
++
+                     // add prompt tokens for processing in the current batch
+                     while (slot.prompt.n_tokens() < slot.task->n_tokens() && batch.n_tokens < n_batch) {
+                         // get next token to process
+@@ -2939,6 +3019,10 @@ private:
+                             break;
+                         }
+ 
++                        // position of cur_tok within the full prompt (0-indexed), before it is pushed
++                        const int32_t pos_cur = slot.prompt.n_tokens();
++                        const bool want_tail_logits = n_tail_eff > 0 && pos_cur >= pos_tail_lo && pos_cur <= pos_tail_hi;
++
+                         // embedding requires all tokens in the batch to be output;
+                         // MTP also wants logits at every prompt position so the
+                         // streaming hook can mirror t_h_pre_norm into ctx_dft.
+@@ -2946,7 +3030,14 @@ private:
+                             cur_tok,
+                             slot.prompt.tokens.pos_next(),
+                             { slot.id },
+-                            slot.need_embd());
++                            slot.need_embd() || want_tail_logits);
++
++                        if (want_tail_logits) {
++                            // batch.n_tokens - 1 is the index just written; its logits predict the
++                            // prompt token at pos_cur + 1
++                            slot.prompt_probs_batch_idx.emplace_back(batch.n_tokens - 1, pos_cur + 1);
++                        }
++
+                         slot.prompt.tokens.push_back(cur_tok);
+ 
+                         slot.n_prompt_tokens_processed++;
+@@ -3250,6 +3341,44 @@ private:
+                     }
+                 }
+ 
++                // prompt_probs_tail: harvest any recorded tail-target logits that fall within
++                // this decode chunk. This must happen now, before i_next advances past this
++                // chunk, since logits are only valid for the most recent llama_decode() call.
++                // Note this is intentionally independent of the slot.i_batch range below
++                // (that one tracks the single next-generated-token position, not the prompt tail).
++                //
++                // `ib` is a batch-local index that gets reused (restarting near 0) every time
++                // the server has to re-enter this code on a later tick to keep filling the same
++                // slot's prompt -- e.g. the checkpoint-offset early-break a few dozen lines above
++                // deliberately stops the fill loop a few tokens before the end of the prompt so a
++                // checkpoint can be taken, leaving the last few tokens to be queued in a fresh,
++                // separately-numbered batch on the next tick. If an entry is only ever range-
++                // checked and never removed, a stale entry from an earlier, already-harvested
++                // chunk whose `ib` happens to coincide with a later chunk's (small) index range
++                // gets matched and harvested a second time -- against the wrong chunk's logits.
++                // Erasing each entry the moment it is harvested guarantees every entry is matched
++                // against exactly one decode call: the one that actually produced its logits.
++                if (!slot.prompt_probs_batch_idx.empty()) {
++                    const auto split = std::stable_partition(
++                        slot.prompt_probs_batch_idx.begin(), slot.prompt_probs_batch_idx.end(),
++                        [i, n_tokens](const std::pair<int32_t, int32_t> & ib_pos) {
++                            const int32_t ib = ib_pos.first;
++                            return ib < i || ib >= (int32_t) (i + n_tokens); // true => not in this chunk, keep for later
++                        });
++
++                    for (auto it = split; it != slot.prompt_probs_batch_idx.end(); ++it) {
++                        const int32_t ib         = it->first;
++                        const int32_t target_pos = it->second;
++
++                        const int tok_idx = ib - i;
++                        const llama_token target_tok = slot.task->tokens[target_pos];
++
++                        slot.prompt_probs_output.push_back(make_prompt_prob_output(slot, target_tok, tok_idx));
++                    }
++
++                    slot.prompt_probs_batch_idx.erase(split, slot.prompt_probs_batch_idx.end());
++                }
++
+                 if (slot.i_batch < (int) i || slot.i_batch >= (int) (i + n_tokens)) {
+                     continue; // continue loop of slots
+                 }
+diff --git a/tools/server/server-task.cpp b/tools/server/server-task.cpp
+index abc00c8..089f1db 100644
+--- a/tools/server/server-task.cpp
++++ b/tools/server/server-task.cpp
+@@ -301,6 +301,7 @@ task_params server_task::params_from_json_cmpl(
+     params.sampling.adaptive_decay     = json_value(data, "adaptive_decay",      defaults.sampling.adaptive_decay);
+     params.sampling.seed               = json_value(data, "seed",                defaults.sampling.seed);
+     params.sampling.n_probs            = json_value(data, "n_probs",             defaults.sampling.n_probs);
++    params.prompt_probs_tail           = json_value(data, "prompt_probs_tail",    defaults.prompt_probs_tail);
+     params.sampling.min_keep           = json_value(data, "min_keep",            defaults.sampling.min_keep);
+     params.sampling.backend_sampling   = json_value(data, "backend_sampling",    defaults.sampling.backend_sampling);
+     params.post_sampling_probs         = json_value(data, "post_sampling_probs", defaults.post_sampling_probs);
+@@ -770,6 +771,11 @@ json server_task_result_cmpl_final::to_json_non_oaicompat() {
+     if (!stream && !probs_output.empty()) {
+         res["completion_probabilities"] = completion_token_output::probs_vector_to_json(probs_output, post_sampling_probs);
+     }
++    if (!stream && !prompt_probs_output.empty()) {
++        // prompt positions are never sampled (no candidate list exists for them),
++        // only raw logits, so this is always reported as logprobs, never post-sampling probs
++        res["prompt_probabilities"] = completion_token_output::probs_vector_to_json(prompt_probs_output, false);
++    }
+     return response_fields.empty() ? res : json_get_nested_values(response_fields, res);
+ }
+ 
+diff --git a/tools/server/server-task.h b/tools/server/server-task.h
+index 60e216e..1420473 100644
+--- a/tools/server/server-task.h
++++ b/tools/server/server-task.h
+@@ -61,6 +61,8 @@ struct task_params {
+ 
+     int32_t n_cache_reuse = 0; // min chunk size to attempt reusing from the cache via KV shifting (0 = disabled)
+ 
++    int32_t prompt_probs_tail = 0; // number of trailing prompt positions to return predicted-token distributions for (0 = disabled)
++
+     // number of prompt tokens before the latest user message
+     int32_t n_before_user = -1;
+ 
+@@ -353,6 +355,7 @@ struct server_task_result_cmpl_final : server_task_result {
+ 
+     bool post_sampling_probs;
+     std::vector<completion_token_output> probs_output;
++    std::vector<completion_token_output> prompt_probs_output;
+     std::vector<std::string>  response_fields;
+ 
+     task_params generation_params;

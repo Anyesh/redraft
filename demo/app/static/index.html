@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>redraft: reactive inference demo</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <h1>redraft</h1>
+    <p class="tagline">Edit the context, not the whole answer. Held tokens are reused, only the diverging span recomputes.</p>
+  </header>
+
+  <main>
+    <section id="about">
+      <h2>What you're watching</h2>
+      <p>Ask most LLM setups to fix one typo in a long document and they regenerate the whole answer from scratch. <code>redraft</code> instead keeps the tokens of the old answer a fresh decode would still produce, and recomputes only the span the edit disturbed, inside the inference engine.</p>
+      <p>Below, two requests run against the same model on the same GPU: <strong>baseline</strong> (full regeneration) and <strong>redraft</strong> (reuse plus patch). A small edit, a typo fix, a reworded sentence, lets redraft finish well ahead of baseline. A large rewrite leaves little to reuse, so redraft can be slower than baseline. Both arms run every time, so you'll see that case too.</p>
+      <p>The idea follows <a href="https://crates.io/crates/incr-compute" target="_blank" rel="noopener">incr</a>: track dependencies, recompute only the delta. redraft applies that to the answer side of an LLM call, not just the prompt's KV cache.</p>
+    </section>
+
+    <section id="half1">
+      <h2>1. Reactive document editor</h2>
+      <p class="sub">Pick a scenario, generate the draft, then edit the source and watch baseline free-decode race the redraft stabilizer.</p>
+      <ol class="steps">
+        <li>Pick a scenario below, or write your own source and question.</li>
+        <li>Click <strong>Generate initial draft</strong>. That output becomes the stale draft redraft will try to reuse.</li>
+        <li>Edit the source text (or leave the scenario's built-in edit), then click <strong>Run edit</strong> to race the two arms.</li>
+      </ol>
+
+      <label for="scenario-select">Scenario</label>
+      <select id="scenario-select"></select>
+
+      <div class="grid-2">
+        <div>
+          <label for="context-old">Source (original)</label>
+          <textarea id="context-old" rows="6"></textarea>
+          <button id="btn-draft">Generate initial draft</button>
+        </div>
+        <div>
+          <label for="draft-pane">Previous draft (becomes the redraft speculation)</label>
+          <textarea id="draft-pane" rows="6" readonly></textarea>
+        </div>
+      </div>
+
+      <label for="question">Question / instruction</label>
+      <input id="question" type="text" />
+
+      <label for="context-new">Source (edit this, or type a custom edit)</label>
+      <textarea id="context-new" rows="6"></textarea>
+      <button id="btn-edit" disabled>Run edit (race baseline vs redraft)</button>
+
+      <div class="grid-2 race">
+        <div class="arm-panel" id="panel-baseline">
+          <h3>baseline <span class="timer" id="timer-baseline">0.00s</span></h3>
+          <pre id="text-baseline"></pre>
+          <div class="readout" id="readout-baseline"></div>
+        </div>
+        <div class="arm-panel" id="panel-redraft">
+          <h3>redraft <span class="timer" id="timer-redraft">0.00s</span></h3>
+          <pre id="text-redraft"></pre>
+          <div class="readout" id="readout-redraft"></div>
+        </div>
+      </div>
+      <p class="hint"><strong>held</strong> is the fraction of the previous draft's tokens redraft could keep instead of recomputing. <strong>divergences</strong> is how many times the edit forced a recompute. More held and fewer divergences means a bigger speedup. A low held fraction is when redraft is likely to lose to baseline.</p>
+      <div id="headline"></div>
+    </section>
+
+    <section id="half2">
+      <h2>2. Agent-loop throughput</h2>
+      <p class="sub">Replays a scripted re-derivation loop: one field of the context changes each step, the prior redraft output is fed back in as the next draft.</p>
+      <p class="hint">Most real workloads involve many small, continuous re-derivations: a spreadsheet cell changes, a document field updates, an agent re-plans one step. This section replays that pattern over several steps and reports the cumulative time saved across the run.</p>
+      <button id="btn-batch">Run agent-loop batch</button>
+      <table id="batch-table">
+        <thead>
+          <tr><th>step</th><th>baseline (s)</th><th>redraft (s)</th><th>speedup</th><th>held</th></tr>
+        </thead>
+        <tbody id="batch-body"></tbody>
+      </table>
+      <div id="batch-summary"></div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

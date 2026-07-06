@@ -1,0 +1,23 @@
+{
+  "widths": [
+    1,
+    8,
+    16,
+    32,
+    64
+  ],
+  "verify_ms_median": {
+    "1": 26.51,
+    "8": 80.76700000000001,
+    "16": 132.531,
+    "32": 239.44400000000002,
+    "64": 457.467
+  },
+  "slope_ms_per_token": 6.791084925183062,
+  "intercept_ms": 22.999544810569915,
+  "decode_ms_per_token": 16.022828125,
+  "slope_over_decode": 0.4238380935127869,
+  "verdict": "AMBIGUOUS: slope between the H1 and H2 bands; report raw numbers, do not force a call",
+  "case_id": "doc-reword-middle",
+  "base_tokens": 101
+}

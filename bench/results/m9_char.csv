@@ -1,0 +1,10 @@
+id,category,arm,repeat,wall_s,server_prompt_ms,server_predicted_ms,http_calls,scoring_calls,chunk_calls,wasted_tokens,tokens,held_fraction,divergences,correct,analytic_speedup
+code-rename-var,code_review,baseline,0,0.5063,37.68,467.94,1,0,0,0,35,,,pass,1.0
+code-rename-var,code_review,"entropy_floor:tau=3.0,floor=1.0",0,5.1056,3592.63,1378.97,10,3,7,0,107,0.4299,4,pass,1.3718
+code-rename-var,code_review,"redraft:entropy_floor:tau=3.0,floor=1.0",0,0.6217,230.97,377.43,1,0,0,0,88,0.2386,1,pass,
+doc-reword-middle,doc_summary,baseline,0,1.2565,37.64,1218.11,1,0,0,0,93,,,pass,1.0
+doc-reword-middle,doc_summary,"entropy_floor:tau=3.0,floor=1.0",0,1.9723,1843.22,85.35,3,2,1,0,76,0.9474,1,pass,5.4286
+doc-reword-middle,doc_summary,"redraft:entropy_floor:tau=3.0,floor=1.0",0,0.3846,207.56,176.2,1,0,0,0,77,0.3636,1,pass,
+doc-fix-punctuation,doc_summary,baseline,0,0.7991,37.3,761.15,1,0,0,0,58,,,pass,1.0
+doc-fix-punctuation,doc_summary,"entropy_floor:tau=3.0,floor=1.0",0,0.8293,814.32,0.0,1,1,0,0,57,1.0,0,pass,14.25
+doc-fix-punctuation,doc_summary,"redraft:entropy_floor:tau=3.0,floor=1.0",0,0.1982,197.17,0.02,1,0,0,0,57,1.0,0,pass,

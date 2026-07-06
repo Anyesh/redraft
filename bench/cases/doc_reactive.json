@@ -1,0 +1,109 @@
+[
+  {
+    "id": "doc-report-shift-quarter",
+    "category": "doc_summary",
+    "question": "Summarize the passage above in three bullet points.",
+    "expect_new": ["18%"],
+    "forbid_new": ["12%"],
+    "context_old": "Q3 revenue grew 12% year over year, driven primarily by expansion in the enterprise segment. Customer churn held steady at 4%. The sales team closed eleven new enterprise accounts during the quarter.",
+    "context_new": "Q3 revenue grew 18% year over year, driven primarily by expansion in the enterprise segment. Customer churn held steady at 4%. The sales team closed eleven new enterprise accounts during the quarter."
+  },
+  {
+    "id": "doc-report-swap-driver",
+    "category": "doc_summary",
+    "question": "Summarize the passage above in three bullet points.",
+    "expect_new": ["self-serve pricing tier"],
+    "forbid_new": ["driven primarily by expansion in the enterprise segment"],
+    "context_old": "Q3 revenue grew 12% year over year, driven primarily by expansion in the enterprise segment. Customer churn held steady at 4%. The sales team closed eleven new enterprise accounts during the quarter.",
+    "context_new": "Q3 revenue grew 12% year over year, driven primarily by a new self-serve pricing tier. Customer churn held steady at 4%. The sales team closed eleven new enterprise accounts during the quarter."
+  },
+  {
+    "id": "doc-table-budget-increase",
+    "category": "doc_summary",
+    "question": "According to the table above, what is Engineering's budget in thousands?",
+    "expect_new": ["610"],
+    "forbid_new": ["450"],
+    "context_old": "Department, Budget (thousands)\nEngineering, 450\nMarketing, 220\nOperations, 180",
+    "context_new": "Department, Budget (thousands)\nEngineering, 610\nMarketing, 220\nOperations, 180"
+  },
+  {
+    "id": "doc-table-new-department",
+    "category": "doc_summary",
+    "question": "According to the table above, which department has the largest budget?",
+    "expect_new": ["Security"],
+    "forbid_new": ["Engineering"],
+    "context_old": "Department, Budget (thousands)\nEngineering, 450\nMarketing, 220\nOperations, 180",
+    "context_new": "Department, Budget (thousands)\nEngineering, 450\nMarketing, 220\nOperations, 180\nSecurity, 520"
+  },
+  {
+    "id": "doc-changelog-new-version",
+    "category": "doc_summary",
+    "question": "Summarize the changelog above in one sentence, naming the latest version and its main new feature.",
+    "expect_new": ["2.4.0"],
+    "context_old": "v2.3.0 - Fixed a crash when exporting large CSV files. Improved startup time by roughly 15%.",
+    "context_new": "v2.3.0 - Fixed a crash when exporting large CSV files. Improved startup time by roughly 15%.\nv2.4.0 - Added dark mode support."
+  },
+  {
+    "id": "doc-changelog-version-bump-message",
+    "category": "doc_summary",
+    "question": "Summarize the changelog above in one sentence, stating the latest version number.",
+    "expect_new": ["2.3.1"],
+    "forbid_new": ["2.3.0"],
+    "context_old": "v2.3.0 - Fixed a crash when exporting large CSV files. Improved startup time by roughly 15%.",
+    "context_new": "v2.3.1 - Fixed a crash when exporting large CSV files. Improved startup time by roughly 15%."
+  },
+  {
+    "id": "doc-status-flip-blocked",
+    "category": "doc_summary",
+    "question": "Summarize the status update above in one sentence, stating the current status.",
+    "expect_new": ["blocked"],
+    "forbid_new": ["on track"],
+    "context_old": "Project Atlas is currently ON TRACK for its Q4 launch. All major milestones have been completed except final QA sign-off.",
+    "context_new": "Project Atlas is currently BLOCKED for its Q4 launch. All major milestones have been completed except final QA sign-off."
+  },
+  {
+    "id": "doc-status-flip-owner",
+    "category": "doc_summary",
+    "question": "Summarize the ticket status above in one sentence, naming who it is assigned to.",
+    "expect_new": ["Marcus"],
+    "forbid_new": ["Priya"],
+    "context_old": "The database migration ticket is currently assigned to Priya and is marked in progress.",
+    "context_new": "The database migration ticket is currently assigned to Marcus and is marked in progress."
+  },
+  {
+    "id": "doc-number-correction-headcount",
+    "category": "doc_summary",
+    "question": "Summarize the passage above in one sentence, stating the current headcount.",
+    "expect_new": ["92"],
+    "forbid_new": ["84"],
+    "context_old": "The engineering org grew to 84 people by the end of the quarter, up from 71 the quarter before.",
+    "context_new": "The engineering org grew to 92 people by the end of the quarter, up from 71 the quarter before."
+  },
+  {
+    "id": "doc-date-correction-deadline",
+    "category": "doc_summary",
+    "question": "Summarize the passage above in one sentence, stating the completion date.",
+    "expect_new": ["April 3rd"],
+    "forbid_new": ["March 14th"],
+    "context_old": "The migration is scheduled to complete by March 14th, pending final sign-off from the security team.",
+    "context_new": "The migration is scheduled to complete by April 3rd, pending final sign-off from the security team."
+  },
+  {
+    "id": "doc-section-deletion-caveat",
+    "category": "doc_summary",
+    "question": "Summarize the passage above in one sentence.",
+    "expect_new": [],
+    "forbid_new": ["cold-start"],
+    "context_old": "The new caching layer reduces average response time by 40%. Note: this improvement does not apply to cold-start requests, which remain unaffected.",
+    "context_new": "The new caching layer reduces average response time by 40%."
+  },
+  {
+    "id": "doc-section-deletion-example",
+    "category": "doc_summary",
+    "question": "Summarize the onboarding checklist above in one sentence.",
+    "expect_new": [],
+    "forbid_new": ["welcome kit"],
+    "context_old": "The onboarding checklist includes account setup, security training, and a 1:1 with your manager. For remote hires, this also includes a shipped welcome kit.",
+    "context_new": "The onboarding checklist includes account setup, security training, and a 1:1 with your manager."
+  }
+]

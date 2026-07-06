@@ -1,0 +1,27 @@
+[
+  {
+    "id": "code-rename-var",
+    "category": "code_review",
+    "question": "Review this function for correctness bugs. Be concise.",
+    "expect_new": ["correct"],
+    "context_old": "def median(xs):\n    s = sorted(xs)\n    n = len(s)\n    mid = n // 2\n    if n % 2 == 1:\n        return s[mid]\n    return (s[mid - 1] + s[mid]) / 2",
+    "context_new": "def median(values):\n    s = sorted(values)\n    n = len(s)\n    mid = n // 2\n    if n % 2 == 1:\n        return s[mid]\n    return (s[mid - 1] + s[mid]) / 2"
+  },
+  {
+    "id": "code-introduce-bug",
+    "category": "code_review",
+    "question": "Review this function for correctness bugs. Be concise.",
+    "expect_new": ["bug"],
+    "forbid_new": ["is correct", "No bugs", "no bugs"],
+    "context_old": "def median(xs):\n    s = sorted(xs)\n    n = len(s)\n    mid = n // 2\n    if n % 2 == 1:\n        return s[mid]\n    return (s[mid - 1] + s[mid]) / 2",
+    "context_new": "def median(xs):\n    s = sorted(xs)\n    n = len(s)\n    mid = n // 2\n    if n % 2 == 1:\n        return s[mid]\n    return (s[mid - 1] + s[mid]) / n"
+  },
+  {
+    "id": "code-add-guard",
+    "category": "code_review",
+    "question": "Review this function for correctness bugs. Be concise.",
+    "expect_new": ["correct"],
+    "context_old": "def median(xs):\n    s = sorted(xs)\n    n = len(s)\n    mid = n // 2\n    if n % 2 == 1:\n        return s[mid]\n    return (s[mid - 1] + s[mid]) / 2",
+    "context_new": "def median(xs):\n    if not xs:\n        raise ValueError('empty input')\n    s = sorted(xs)\n    n = len(s)\n    mid = n // 2\n    if n % 2 == 1:\n        return s[mid]\n    return (s[mid - 1] + s[mid]) / 2"
+  }
+]

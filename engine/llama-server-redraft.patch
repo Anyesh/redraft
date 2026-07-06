@@ -1,0 +1,250 @@
+diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
+index af18dd1..690a88b 100644
+--- a/tools/server/server-context.cpp
++++ b/tools/server/server-context.cpp
+@@ -13,6 +13,7 @@
+ #include "log.h"
+ #include "sampling.h"
+ #include "speculative.h"
++#include "redraft_stabilize.hpp"
+ #include "mtmd.h"
+ #include "mtmd-helper.h"
+ 
+@@ -101,6 +102,13 @@ struct server_slot {
+     std::vector<std::pair<int32_t, int32_t>> prompt_probs_batch_idx; // (i_batch, target prompt pos)
+     std::vector<completion_token_output> prompt_probs_output;
+ 
++    // redraft_stabilize: in-engine stabilize output for this slot, copied into
++    // the final response
++    std::vector<llama_token> redraft_emitted;
++    double  redraft_held_fraction = 0.0;
++    int32_t redraft_divergences   = 0;
++    std::unique_ptr<redraft::redraft_session> redraft_session;
++
+     bool has_next_token = true;
+     bool has_new_line   = false;
+     bool truncated      = false;
+@@ -208,6 +216,10 @@ struct server_slot {
+         generated_token_probs.clear();
+         prompt_probs_batch_idx.clear();
+         prompt_probs_output.clear();
++        redraft_emitted.clear();
++        redraft_held_fraction = 0.0;
++        redraft_divergences = 0;
++        redraft_session.reset();
+         json_schema = json();
+ 
+         // clear speculative decoding stats
+@@ -1879,6 +1891,11 @@ private:
+         // populate res.prompt_probs_output (prompt_probs_tail)
+         res->prompt_probs_output = std::move(slot.prompt_probs_output);
+ 
++        // redraft_stabilize output
++        res->redraft_emitted       = std::move(slot.redraft_emitted);
++        res->redraft_held_fraction = slot.redraft_held_fraction;
++        res->redraft_divergences   = slot.redraft_divergences;
++
+         res->generation_params = slot.task->params; // copy the parameters
+ 
+         queue_results.send(std::move(res));
+@@ -2458,6 +2475,12 @@ private:
+                 continue;
+             }
+ 
++            // a redraft slot drives its own windowed decode in the redraft servicing
++            // loop, so it must not be added to the shared generation batch here.
++            if (slot.redraft_session) {
++                continue;
++            }
++
+             // check if we can batch this slot with the previous one
+             if (!slot_batched) {
+                 slot_batched = &slot;
+@@ -3173,13 +3196,21 @@ private:
+             llama_set_embeddings(ctx_tgt, slot_batched->need_embd());
+         }
+ 
+-        if (batch.n_tokens == 0) {
++        bool any_redraft_active = false;
++        for (auto & slot : slots) {
++            if (slot.redraft_session) {
++                any_redraft_active = true;
++                break;
++            }
++        }
++
++        if (batch.n_tokens == 0 && !any_redraft_active) {
+             SRV_WRN("%s", "no tokens to decode\n");
+ 
+             if (++n_empty_consecutive > 3) {
+                 GGML_ABORT("fatal error - please provide logs and repro in %s\n", "https://github.com/ggml-org/llama.cpp/pull/20277");
+             }
+-        } else {
++        } else if (batch.n_tokens > 0) {
+             n_empty_consecutive = 0;
+         }
+ 
+@@ -3417,6 +3448,35 @@ private:
+ 
+                 const int tok_idx = slot.i_batch - i;
+ 
++                if (slot.task->params.redraft.enabled) {
++                    slot.i_batch = -1;
++
++                    redraft::redraft_run_params rp;
++                    rp.old_output = std::vector<redraft::token_id>(slot.task->params.redraft.old_output.begin(), slot.task->params.redraft.old_output.end());
++                    rp.tau        = slot.task->params.redraft.tau;
++                    rp.floor      = slot.task->params.redraft.floor;
++                    rp.horizon    = (size_t) slot.task->params.redraft.horizon;
++                    rp.anchor_len = (size_t) slot.task->params.redraft.anchor_len;
++                    rp.max_tokens = (size_t) slot.task->params.redraft.max_tokens;
++                    rp.eos        = std::unordered_set<redraft::token_id>(slot.task->params.redraft.eos.begin(), slot.task->params.redraft.eos.end());
++                    rp.recurrent  = llama_model_is_recurrent(llama_get_model(ctx_tgt)) || llama_model_is_hybrid(llama_get_model(ctx_tgt));
++                    {
++                        auto tt = slot.prompt.tokens.get_text_tokens();
++                        rp.template_ids = std::vector<redraft::token_id>(tt.begin(), tt.end());
++                    }
++                    rp.n_batch    = (int) llama_n_batch(ctx_tgt);
++
++                    const int n_vocab = llama_vocab_n_tokens(llama_model_get_vocab(llama_get_model(ctx_tgt)));
++                    slot.redraft_session = std::make_unique<redraft::redraft_session>();
++                    slot.redraft_session->init(ctx_tgt, n_vocab, slot.id, (size_t) slot.prompt.n_tokens(), tok_idx, rp);
++
++                    // the stabilize loop is advanced one draft window per tick in the
++                    // redraft servicing loop after the decode loop, so it streams and
++                    // yields the shared decode step to other slots instead of running
++                    // to completion here.
++                    continue;
++                }
++
+                 llama_token id = common_sampler_sample(slot.smpl.get(), slot.ctx_tgt, tok_idx);
+ 
+                 slot.i_batch = -1;
+@@ -3576,6 +3636,54 @@ private:
+             }
+         }
+ 
++        // redraft servicing: advance each in-flight stabilize session by one draft
++        // window per tick. Emitted tokens go through the normal token path so SSE
++        // streaming, stop strings, and the n_predict budget reuse the standard
++        // machinery; the session owns its own decode, so this runs even on ticks
++        // where the shared batch is empty (a lone redraft slot) and yields between
++        // windows under --parallel N.
++        for (auto & slot : slots) {
++            if (slot.state != SLOT_STATE_GENERATING || !slot.redraft_session) {
++                continue;
++            }
++
++            std::vector<llama_token> delta = slot.redraft_session->step();
++
++            bool stopped = false;
++            for (llama_token tok : delta) {
++                if (slot.n_decoded == 0) {
++                    slot.t_start_generation = ggml_time_us();
++                    slot.t_prompt_processing = (slot.t_start_generation - slot.t_start_process_prompt) / 1e3;
++                    metrics.on_prompt_eval(slot);
++                }
++                slot.n_decoded += 1;
++                slot.t_token_generation = std::max<int64_t>(1, ggml_time_us() - slot.t_start_generation) / 1e3;
++
++                completion_token_output result;
++                result.tok          = tok;
++                result.text_to_send = common_token_to_piece(slot.ctx_tgt, result.tok, accept_special_token(slot, result.tok));
++                result.prob         = 1.0f;
++
++                if (!process_token(result, slot)) {
++                    stopped = true;
++                    break;
++                }
++            }
++
++            if (stopped || slot.redraft_session->done()) {
++                slot.redraft_held_fraction = slot.redraft_session->held_fraction();
++                slot.redraft_divergences   = slot.redraft_session->divergences();
++                slot.redraft_emitted.assign(slot.redraft_session->emitted().begin(),
++                                            slot.redraft_session->emitted().end());
++                slot.redraft_session.reset();
++
++                slot.print_timings();
++                send_final_response(slot);
++                metrics.on_prediction(slot);
++                slot.release();
++            }
++        }
++
+         SRV_DBG("%s", "run slots completed\n");
+     }
+ 
+diff --git a/tools/server/server-task.cpp b/tools/server/server-task.cpp
+index 089f1db..464c1b5 100644
+--- a/tools/server/server-task.cpp
++++ b/tools/server/server-task.cpp
+@@ -302,6 +302,18 @@ task_params server_task::params_from_json_cmpl(
+     params.sampling.seed               = json_value(data, "seed",                defaults.sampling.seed);
+     params.sampling.n_probs            = json_value(data, "n_probs",             defaults.sampling.n_probs);
+     params.prompt_probs_tail           = json_value(data, "prompt_probs_tail",    defaults.prompt_probs_tail);
++
++    if (data.contains("redraft_stabilize") && data.at("redraft_stabilize").is_object()) {
++        const json & r = data.at("redraft_stabilize");
++        params.redraft.enabled    = true;
++        params.redraft.old_output = r.value("old_output", std::vector<llama_token>());
++        params.redraft.tau        = r.value("tau",        3.0);
++        params.redraft.floor      = r.value("floor",      1.0);
++        params.redraft.horizon    = r.value("horizon",    64);
++        params.redraft.anchor_len = r.value("anchor_len", 3);
++        params.redraft.max_tokens = r.value("max_tokens", 512);
++        params.redraft.eos        = r.value("eos",        std::vector<llama_token>());
++    }
+     params.sampling.min_keep           = json_value(data, "min_keep",            defaults.sampling.min_keep);
+     params.sampling.backend_sampling   = json_value(data, "backend_sampling",    defaults.sampling.backend_sampling);
+     params.post_sampling_probs         = json_value(data, "post_sampling_probs", defaults.post_sampling_probs);
+@@ -776,6 +788,11 @@ json server_task_result_cmpl_final::to_json_non_oaicompat() {
+         // only raw logits, so this is always reported as logprobs, never post-sampling probs
+         res["prompt_probabilities"] = completion_token_output::probs_vector_to_json(prompt_probs_output, false);
+     }
++    if (!redraft_emitted.empty()) {
++        res["redraft_emitted"]       = redraft_emitted;
++        res["redraft_held_fraction"] = redraft_held_fraction;
++        res["redraft_divergences"]   = redraft_divergences;
++    }
+     return response_fields.empty() ? res : json_get_nested_values(response_fields, res);
+ }
+ 
+diff --git a/tools/server/server-task.h b/tools/server/server-task.h
+index 1420473..3690bef 100644
+--- a/tools/server/server-task.h
++++ b/tools/server/server-task.h
+@@ -63,6 +63,20 @@ struct task_params {
+ 
+     int32_t prompt_probs_tail = 0; // number of trailing prompt positions to return predicted-token distributions for (0 = disabled)
+ 
++    // redraft_stabilize: in-engine bounded-mode output stabilization. When set,
++    // the slot runs the whole stabilize loop and returns the emitted ids in one response.
++    struct redraft_stab_params {
++        bool enabled = false;
++        std::vector<llama_token> old_output;
++        double  tau        = 3.0;
++        double  floor      = 1.0;
++        int32_t horizon    = 64;
++        int32_t anchor_len = 3;
++        int32_t max_tokens = 512;
++        std::vector<llama_token> eos;
++    };
++    redraft_stab_params redraft;
++
+     // number of prompt tokens before the latest user message
+     int32_t n_before_user = -1;
+ 
+@@ -356,6 +370,12 @@ struct server_task_result_cmpl_final : server_task_result {
+     bool post_sampling_probs;
+     std::vector<completion_token_output> probs_output;
+     std::vector<completion_token_output> prompt_probs_output;
++
++    // redraft_stabilize output
++    std::vector<llama_token> redraft_emitted;
++    double  redraft_held_fraction = 0.0;
++    int32_t redraft_divergences   = 0;
++
+     std::vector<std::string>  response_fields;
+ 
+     task_params generation_params;

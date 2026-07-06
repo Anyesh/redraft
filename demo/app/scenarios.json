@@ -1,0 +1,44 @@
+{
+  "edits": [
+    {
+      "id": "doc-fix-punctuation",
+      "label": "Cosmetic edit (semicolon swap)",
+      "category": "doc_summary",
+      "question": "Summarize the passage above in three bullet points.",
+      "context_old": "Photosynthesis converts light energy into chemical energy stored in glucose. It occurs in the chloroplasts of plant cells. The process releases oxygen as a byproduct, which most life on Earth depends on.",
+      "context_new": "Photosynthesis converts light energy into chemical energy stored in glucose; it occurs in the chloroplasts of plant cells. The process releases oxygen as a byproduct, which most life on Earth depends on.",
+      "expect_high_held": true
+    },
+    {
+      "id": "doc-append-sentence",
+      "label": "Appended sentence (rewrite-heavy)",
+      "category": "doc_summary",
+      "question": "Summarize the passage above in three bullet points.",
+      "context_old": "The Aral Sea was once the fourth-largest lake in the world. Soviet irrigation projects diverted its feeder rivers in the 1960s. By 2007 it had shrunk to a tenth of its original size, leaving behind a salt desert and a collapsed fishing industry.",
+      "context_new": "The Aral Sea was once the fourth-largest lake in the world. Soviet irrigation projects diverted its feeder rivers in the 1960s. By 2007 it had shrunk to a tenth of its original size, leaving behind a salt desert and a collapsed fishing industry. A 2005 dam has since partially restored the northern basin.",
+      "expect_high_held": false
+    },
+    {
+      "id": "code-add-guard",
+      "label": "Add an input guard clause",
+      "category": "code_review",
+      "question": "Review this function for correctness bugs. Be concise.",
+      "context_old": "def median(xs):\n    s = sorted(xs)\n    n = len(s)\n    mid = n // 2\n    if n % 2 == 1:\n        return s[mid]\n    return (s[mid - 1] + s[mid]) / 2",
+      "context_new": "def median(xs):\n    if not xs:\n        raise ValueError('empty input')\n    s = sorted(xs)\n    n = len(s)\n    mid = n // 2\n    if n % 2 == 1:\n        return s[mid]\n    return (s[mid - 1] + s[mid]) / 2",
+      "expect_high_held": true
+    }
+  ],
+  "batch": {
+    "id": "agent-loop-population-table",
+    "label": "Agent loop: re-derive an answer as a source table grows",
+    "question": "What is the capital of the country with the largest population in the table above?",
+    "steps": [
+      "Country, Population (millions), Capital\nIndia, 1428, New Delhi\nChina, 1425, Beijing\nUnited States, 340, Washington",
+      "Country, Population (millions), Capital\nIndia, 1428, New Delhi\nChina, 1425, Beijing\nUnited States, 340, Washington\nIndonesia, 277, Jakarta",
+      "Country, Population (millions), Capital\nIndia, 1428, New Delhi\nChina, 1425, Beijing\nUnited States, 340, Washington\nIndonesia, 277, Jakarta\nPakistan, 240, Islamabad",
+      "Country, Population (millions), Capital\nIndia, 1428, New Delhi\nChina, 1425, Beijing\nUnited States, 340, Washington\nIndonesia, 277, Jakarta\nPakistan, 240, Islamabad\nBrazil, 216, Brasilia",
+      "Country, Population (millions), Capital\nIndia, 1428, New Delhi\nChina, 1425, Beijing\nUnited States, 340, Washington\nIndonesia, 277, Jakarta\nPakistan, 240, Islamabad\nBrazil, 216, Brasilia\nNigeria, 223, Abuja",
+      "Country, Population (millions), Capital\nIndia, 1300, New Delhi\nChina, 1425, Beijing\nUnited States, 340, Washington\nIndonesia, 277, Jakarta\nPakistan, 240, Islamabad\nBrazil, 216, Brasilia\nNigeria, 223, Abuja"
+    ]
+  }
+}

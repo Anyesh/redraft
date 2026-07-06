@@ -1,0 +1,56 @@
+[
+  {
+    "id": "code-fix-sort-order-bug",
+    "category": "code_review",
+    "question": "Review this function for correctness bugs. Be concise.",
+    "expect_new": ["correct"],
+    "forbid_new": ["reverse=True"],
+    "context_old": "def median(xs):\n    s = sorted(xs, reverse=True)\n    n = len(s)\n    mid = n // 2\n    if n % 2 == 1:\n        return s[mid]\n    return (s[mid - 1] + s[mid]) / 2",
+    "context_new": "def median(xs):\n    s = sorted(xs)\n    n = len(s)\n    mid = n // 2\n    if n % 2 == 1:\n        return s[mid]\n    return (s[mid - 1] + s[mid]) / 2"
+  },
+  {
+    "id": "code-fix-dedupe-condition-bug",
+    "category": "code_review",
+    "question": "Review this function for correctness bugs. Be concise.",
+    "expect_new": ["correct"],
+    "forbid_new": ["returns duplicates"],
+    "context_old": "def dedupe(items):\n    seen = set()\n    out = []\n    for x in items:\n        if x in seen:\n            seen.add(x)\n            out.append(x)\n    return out",
+    "context_new": "def dedupe(items):\n    seen = set()\n    out = []\n    for x in items:\n        if x not in seen:\n            seen.add(x)\n            out.append(x)\n    return out"
+  },
+  {
+    "id": "doc-change-decade",
+    "category": "doc_summary",
+    "question": "Summarize the passage above in three bullet points.",
+    "expect_new": ["1980s"],
+    "forbid_new": ["1960s"],
+    "context_old": "The Aral Sea was once the fourth-largest lake in the world. Soviet irrigation projects diverted its feeder rivers in the 1960s. By 2007 it had shrunk to a tenth of its original size, leaving behind a salt desert and a collapsed fishing industry.",
+    "context_new": "The Aral Sea was once the fourth-largest lake in the world. Soviet irrigation projects diverted its feeder rivers in the 1980s. By 2007 it had shrunk to a tenth of its original size, leaving behind a salt desert and a collapsed fishing industry."
+  },
+  {
+    "id": "doc-change-shrink-fraction",
+    "category": "doc_summary",
+    "question": "Summarize the passage above in three bullet points.",
+    "expect_new": ["quarter"],
+    "forbid_new": ["a tenth"],
+    "context_old": "The Aral Sea was once the fourth-largest lake in the world. Soviet irrigation projects diverted its feeder rivers in the 1960s. By 2007 it had shrunk to a tenth of its original size, leaving behind a salt desert and a collapsed fishing industry.",
+    "context_new": "The Aral Sea was once the fourth-largest lake in the world. Soviet irrigation projects diverted its feeder rivers in the 1960s. By 2007 it had shrunk to a quarter of its original size, leaving behind a salt desert and a collapsed fishing industry."
+  },
+  {
+    "id": "fact-third-country-overtakes",
+    "category": "fact_answer",
+    "question": "What is the capital of the country with the largest population in the table?",
+    "expect_new": ["Jakarta"],
+    "forbid_new": ["New Delhi"],
+    "context_old": "Country, Population (millions), Capital\nIndia, 1428, New Delhi\nChina, 1425, Beijing\nUnited States, 340, Washington\nIndonesia, 277, Jakarta",
+    "context_new": "Country, Population (millions), Capital\nIndia, 1428, New Delhi\nChina, 1425, Beijing\nUnited States, 340, Washington\nIndonesia, 1500, Jakarta"
+  },
+  {
+    "id": "fact-change-capital-value",
+    "category": "fact_answer",
+    "question": "What is the capital of the country with the largest population in the table?",
+    "expect_new": ["Mumbai"],
+    "forbid_new": ["New Delhi"],
+    "context_old": "Country, Population (millions), Capital\nIndia, 1428, New Delhi\nChina, 1425, Beijing\nUnited States, 340, Washington\nIndonesia, 277, Jakarta",
+    "context_new": "Country, Population (millions), Capital\nIndia, 1428, Mumbai\nChina, 1425, Beijing\nUnited States, 340, Washington\nIndonesia, 277, Jakarta"
+  }
+]
