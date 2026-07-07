@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from app.redraft_client import (
+from redraft_client import (
     ANCHOR_LEN,
     FLOOR,
     HORIZON,

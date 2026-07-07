@@ -72,6 +72,7 @@ WORKDIR /app
 COPY --from=builder /build/build/bin/llama-server /app/bin/llama-server
 COPY --from=builder /build/build/bin/*.so* /app/bin/
 
+COPY clients/python/redraft_client /clients/python/redraft_client
 COPY demo/pyproject.toml demo/uv.lock /app/
 RUN uv sync --frozen --no-dev
 COPY demo/app /app/app

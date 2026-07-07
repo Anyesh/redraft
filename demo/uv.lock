@@ -415,12 +415,30 @@ wheels = [
 ]
 
 [[package]]
+name = "redraft-client"
+version = "0.1.0"
+source = { editable = "../clients/python/redraft_client" }
+dependencies = [
+    { name = "httpx" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "httpx", specifier = ">=0.27" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+]
+
+[[package]]
 name = "redraft-space"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "redraft-client" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -434,6 +452,7 @@ dev = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
+    { name = "redraft-client", editable = "../clients/python/redraft_client" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
 

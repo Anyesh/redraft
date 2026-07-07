@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app.redraft_client import (
+from redraft_client import (
     RedraftClient,
     collect_baseline,
     collect_redraft,

@@ -1,7 +1,7 @@
-"""Self-contained llama-server client for the redraft demo Space.
+"""Shared llama-server client for redraft integrations (demo, daemon).
 
 Vendored from bench/bench/{stab_engine.py,measure_wall.py}'s request
-shapes so this Space has no dependency on the bench tree. Ship rule is fixed to
+shapes so consumers have no dependency on the bench tree. Ship rule is fixed to
 entropy_floor:tau=3.0,floor=1.0 (the m5-selected, cross-model zero-regression rule).
 """
 

@@ -1,0 +1,21 @@
+[project]
+name = "redraft-client"
+version = "0.1.0"
+description = "Shared llama-server client for redraft integrations (demo, daemon)"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=0.24"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["redraft_client"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
