@@ -1,6 +1,6 @@
 [project]
 name = "redraftd"
-version = "0.1.0"
+version = "0.2.0"
 description = "Session-based local daemon fronting the patched llama-server for redraft integrations"
 requires-python = ">=3.11"
 dependencies = [

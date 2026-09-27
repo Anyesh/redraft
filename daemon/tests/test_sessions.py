@@ -1,69 +1,76 @@
 import asyncio
 
-from daemon.sessions import DropStaleRunner, SessionStore
+import pytest
+
+from daemon.sessions import (
+    BadSessionId,
+    DropStaleRunner,
+    Session,
+    SessionStore,
+    Source,
+    parse_session_id,
+)
 
 
-def test_create_and_get_round_trips():
-    store = SessionStore(cap=10)
-    session_id, session = store.create("summarize", "doc text", 512)
-    assert store.get(session_id) is session
-    assert session.instruction == "summarize"
-    assert session.context == "doc text"
-    assert session.max_tokens == 512
-    assert session.tokens == []
-    assert session.last_text == ""
+def session(sid: str) -> Session:
+    return Session(
+        session_id=sid,
+        instruction="summarize",
+        sources=[Source(name="notes", text="n")],
+        derived="",
+        pinned=[],
+        max_tokens=64,
+    )
 
 
-def test_get_unknown_session_returns_none():
-    store = SessionStore(cap=10)
-    assert store.get("nope") is None
+def test_session_id_has_three_segments():
+    assert parse_session_id("acme/doc-1/intro") == ("acme", "doc-1", "intro")
 
 
-def test_update_sets_fields_and_carries_tokens_forward():
-    store = SessionStore(cap=10)
-    session_id, _ = store.create("summarize", "doc v1", 512)
-    store.update(session_id, text="answer v1", tokens=[1, 2, 3])
-    session = store.get(session_id)
-    assert session.last_text == "answer v1"
-    assert session.tokens == [1, 2, 3]
-
-    store.update(session_id, text="answer v2", tokens=[4, 5], context="doc v2")
-    session = store.get(session_id)
-    assert session.last_text == "answer v2"
-    assert session.tokens == [4, 5]
-    assert session.context == "doc v2"
+@pytest.mark.parametrize(
+    "sid", ["acme/doc", "acme/doc/a/b", "acme//s", "acme/d/s p", "a/" + "x" * 129 + "/s"]
+)
+def test_bad_session_ids_are_rejected(sid):
+    with pytest.raises(BadSessionId):
+        parse_session_id(sid)
 
 
-def test_delete_removes_session():
-    store = SessionStore(cap=10)
-    session_id, _ = store.create("summarize", "doc", 512)
-    assert store.delete(session_id) is True
-    assert store.get(session_id) is None
-    assert store.delete(session_id) is False
+def test_put_get_delete_round_trip():
+    store = SessionStore(cap=4, tenant_cap=4)
+    store.put(session("acme/d/s"))
+    assert store.get("acme/d/s").instruction == "summarize"
+    assert store.delete("acme/d/s")
+    assert store.get("acme/d/s") is None
+    assert not store.delete("acme/d/s")
 
 
-def test_lru_eviction_pops_oldest_untouched_session():
-    store = SessionStore(cap=2)
-    first, _ = store.create("a", "ctx-a", 512)
-    second, _ = store.create("b", "ctx-b", 512)
-    third, _ = store.create("c", "ctx-c", 512)
+def test_tenant_cap_evicts_that_tenants_oldest_section_only():
+    store = SessionStore(cap=10, tenant_cap=2)
+    store.put(session("globex/d/s"))
+    store.put(session("acme/d/a"))
+    store.put(session("acme/d/b"))
+    store.put(session("acme/d/c"))
+    assert store.get("acme/d/a") is None
+    assert store.get("acme/d/b") is not None
+    assert store.get("globex/d/s") is not None
 
+
+def test_global_cap_evicts_least_recently_used():
+    store = SessionStore(cap=2, tenant_cap=2)
+    store.put(session("acme/d/a"))
+    store.put(session("globex/d/b"))
+    store.get("acme/d/a")
+    store.put(session("initech/d/c"))
+    assert store.get("globex/d/b") is None
+    assert store.get("acme/d/a") is not None
     assert len(store) == 2
-    assert store.get(first) is None
-    assert store.get(second) is not None
-    assert store.get(third) is not None
 
 
-def test_get_promotes_recency_and_saves_from_eviction():
-    store = SessionStore(cap=2)
-    first, _ = store.create("a", "ctx-a", 512)
-    second, _ = store.create("b", "ctx-b", 512)
-
-    store.get(first)
-    store.create("c", "ctx-c", 512)
-
-    assert store.get(first) is not None
-    assert store.get(second) is None
+def test_put_replaces_an_existing_section_without_evicting():
+    store = SessionStore(cap=1, tenant_cap=1)
+    store.put(session("acme/d/a"))
+    store.put(session("acme/d/a"))
+    assert len(store) == 1
 
 
 async def test_drop_stale_runner_replace_cancels_previous_task():
