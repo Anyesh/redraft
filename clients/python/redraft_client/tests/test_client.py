@@ -302,3 +302,48 @@ async def test_stream_redraft_yields_parsed_events_with_redraft_fields():
     events = [e async for e in client.stream_redraft([1, 2], [9], {3}, 512)]
     assert is_final(events[-1])
     assert collect_redraft(events)["held_fraction"] == 0.9
+
+
+def test_payloads_pin_a_slot_only_when_asked():
+    assert "id_slot" not in baseline_payload("m", [1], 8)
+    assert baseline_payload("m", [1], 8, id_slot=1)["id_slot"] == 1
+    assert redraft_payload("m", [1], [2], [3], 8, id_slot=0)["id_slot"] == 0
+
+
+async def test_tokenize_with_pieces_returns_ids_and_pieces():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(
+            200,
+            json={"tokens": [{"id": 5, "piece": "a"}, {"id": 6, "piece": [240, 159]}]},
+        )
+
+    client = _client_with_handler(handler)
+    ids, pieces = await client.tokenize_with_pieces("x")
+    assert seen["body"]["with_pieces"] is True
+    assert ids == [5, 6]
+    assert pieces == ["a", [240, 159]]
+
+
+async def test_props_returns_the_json_body():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"total_slots": 2})
+
+    client = _client_with_handler(handler)
+    assert (await client.props())["total_slots"] == 2
+
+
+async def test_streamed_completions_never_reuse_their_connection():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["connection"] = request.headers.get("connection")
+        return httpx.Response(
+            200, content=b'data: {"content": "", "stop": true}\n\n'
+        )
+
+    client = _client_with_handler(handler)
+    [e async for e in client.stream_baseline([1], 1)]
+    assert seen["connection"] == "close"

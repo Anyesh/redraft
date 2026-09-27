@@ -17,16 +17,27 @@ TAU = 3.0
 FLOOR = 1.0
 
 
-def baseline_payload(model: str, prompt_ids: Sequence[int], max_tokens: int) -> dict:
-    return {
-        "model": model,
-        "prompt": list(prompt_ids),
-        "n_predict": max_tokens,
-        "temperature": 0,
-        "cache_prompt": True,
-        "return_tokens": True,
-        "stream": True,
-    }
+def _pin_slot(payload: dict, id_slot: int | None) -> dict:
+    if id_slot is not None:
+        payload["id_slot"] = id_slot
+    return payload
+
+
+def baseline_payload(
+    model: str, prompt_ids: Sequence[int], max_tokens: int, id_slot: int | None = None
+) -> dict:
+    return _pin_slot(
+        {
+            "model": model,
+            "prompt": list(prompt_ids),
+            "n_predict": max_tokens,
+            "temperature": 0,
+            "cache_prompt": True,
+            "return_tokens": True,
+            "stream": True,
+        },
+        id_slot,
+    )
 
 
 def redraft_payload(
@@ -39,8 +50,9 @@ def redraft_payload(
     floor: float = FLOOR,
     horizon: int = HORIZON,
     anchor_len: int = ANCHOR_LEN,
+    id_slot: int | None = None,
 ) -> dict:
-    return {
+    payload = {
         "model": model,
         "prompt": list(prompt_ids),
         # the in-engine loop streams through the normal token path, so n_predict must
@@ -59,6 +71,7 @@ def redraft_payload(
             "eos": sorted(eos_ids),
         },
     }
+    return _pin_slot(payload, id_slot)
 
 
 def parse_sse_line(line: str) -> dict | None:
@@ -158,6 +171,24 @@ class RedraftClient:
         tokens = resp.json()["tokens"]
         return [t["id"] if isinstance(t, dict) else t for t in tokens]
 
+    async def tokenize_with_pieces(
+        self, text: str
+    ) -> tuple[list[int], list[str | list[int]]]:
+        """Token ids plus each token's piece: a string, or a byte list when the
+        piece alone is not valid UTF-8."""
+        resp = await self.http.post(
+            "/tokenize",
+            json={"model": self.model, "content": text, "with_pieces": True},
+        )
+        resp.raise_for_status()
+        tokens = resp.json()["tokens"]
+        return [t["id"] for t in tokens], [t["piece"] for t in tokens]
+
+    async def props(self) -> dict:
+        resp = await self.http.get("/props", params={"model": self.model})
+        resp.raise_for_status()
+        return resp.json()
+
     async def detokenize(self, ids: Sequence[int]) -> str:
         resp = await self.http.post(
             "/detokenize", json={"model": self.model, "tokens": list(ids)}
@@ -181,7 +212,12 @@ class RedraftClient:
         return set(await self.tokenize(resp.json()["eos_token"]))
 
     async def _stream_completion(self, payload: dict) -> AsyncIterator[dict]:
-        async with self.http.stream("POST", "/completion", json=payload) as resp:
+        # llama-server closes the socket after a streamed response despite
+        # advertising keep-alive, so a pooled reuse races that close and fails
+        # with RemoteProtocolError. Closing it from our side avoids the reuse.
+        async with self.http.stream(
+            "POST", "/completion", json=payload, headers={"Connection": "close"}
+        ) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
                 event = parse_sse_line(line)
@@ -189,10 +225,10 @@ class RedraftClient:
                     yield event
 
     def stream_baseline(
-        self, prompt_ids: Sequence[int], max_tokens: int
+        self, prompt_ids: Sequence[int], max_tokens: int, id_slot: int | None = None
     ) -> AsyncIterator[dict]:
         return self._stream_completion(
-            baseline_payload(self.model, prompt_ids, max_tokens)
+            baseline_payload(self.model, prompt_ids, max_tokens, id_slot)
         )
 
     def stream_redraft(
@@ -201,7 +237,10 @@ class RedraftClient:
         old_ids: Sequence[int],
         eos_ids: Iterable[int],
         max_tokens: int,
+        id_slot: int | None = None,
     ) -> AsyncIterator[dict]:
         return self._stream_completion(
-            redraft_payload(self.model, prompt_ids, old_ids, eos_ids, max_tokens)
+            redraft_payload(
+                self.model, prompt_ids, old_ids, eos_ids, max_tokens, id_slot=id_slot
+            )
         )
