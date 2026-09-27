@@ -71,6 +71,11 @@ async def cmd_judge(args) -> int:
                         record["redraft"]["text"],
                         record["sources"],
                     )
+                    repeat = record.get("baseline_repeat")
+                    if repeat is not None:
+                        verdict["control"] = await fact_diff(
+                            judge, record["baseline"]["text"], repeat["text"], record["sources"]
+                        )
                 except JudgeError as exc:
                     verdict = {"unjudged": True, "error": str(exc)}
                 fh.write(json.dumps({"unit_id": record["unit_id"], **verdict}) + "\n")

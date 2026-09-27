@@ -50,7 +50,7 @@ async def test_each_side_runs_from_a_restored_warm_state():
     record = await run_unit(fake.client(), rederive_unit(), redraft_first=True)
     kinds = [(m, p.rsplit("/", 1)[-1] if p.endswith("refresh") else m) for m, p, _ in fake.requests]
     one_side = [("PUT", "PUT"), ("POST", "refresh"), ("PUT", "PUT"), ("POST", "refresh")]
-    assert kinds == one_side + one_side + [("DELETE", "DELETE")]
+    assert kinds == one_side * 3 + [("DELETE", "DELETE")]
     warmups = [b for m, p, b in fake.requests if p.endswith("/refresh")][0::2]
     assert all(b == {"baseline": True} for b in warmups)
     puts = [b for m, p, b in fake.requests if m == "PUT"]
@@ -58,13 +58,14 @@ async def test_each_side_runs_from_a_restored_warm_state():
     assert all(b["sources"] == [{"name": "t", "text": "friday"}] for b in puts)
     assert record["baseline"]["text"] == "baseline text"
     assert record["redraft"]["text"] == "redraft text"
+    assert record["baseline_repeat"]["text"] == "baseline text"
     assert record["sources"] == [["t", "monday"]]
 
 
 async def test_order_follows_redraft_first():
     fake = FakeRedraftd()
     await run_unit(fake.client(), rederive_unit(), redraft_first=False)
-    assert [b["baseline"] for b in timed_bodies(fake)] == [True, False]
+    assert [b["baseline"] for b in timed_bodies(fake)] == [True, False, True]
     assert all(b["sources"] == [{"name": "t", "text": "monday"}] for b in timed_bodies(fake))
 
 

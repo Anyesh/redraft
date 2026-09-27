@@ -77,14 +77,16 @@ async def run_unit(client: Redraftd, unit: Unit, redraft_first: bool) -> dict:
 
     runs = {}
     order = ["redraft", "baseline"] if redraft_first else ["baseline", "redraft"]
-    for side in order:
+    # a second baseline measures the engine's own run-to-run drift, the floor
+    # redraft's fact failures are judged against
+    for side in [*order, "baseline_repeat"]:
         await client.put(path, setup)
         # the warm-up leaves the before-state prompt cached on the section's slot,
         # as a real previous refresh would; the second PUT restores derived_before
         # as the draft, since the warm-up replaced it
         await client.refresh(path, {"baseline": True})
         await client.put(path, setup)
-        text, done = await client.refresh(path, {**change, "baseline": side == "baseline"})
+        text, done = await client.refresh(path, {**change, "baseline": side != "redraft"})
         runs[side] = {"text": text, "done": done}
     await client.delete(path)
 
@@ -98,6 +100,7 @@ async def run_unit(client: Redraftd, unit: Unit, redraft_first: bool) -> dict:
         "redraft_first": redraft_first,
         "baseline": runs["baseline"],
         "redraft": runs["redraft"],
+        "baseline_repeat": runs["baseline_repeat"],
         "reference": unit.reference,
     }
 

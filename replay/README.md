@@ -14,8 +14,9 @@ uv run redraft-replay report --results results.jsonl --verdicts verdicts.jsonl
 ```
 
 - `run` turns every rederive refresh and every correction in the bundle into a unit. Each unit is
-  timed twice from the same warm slot state, once with `baseline: true` and once with redraft,
-  alternating which goes first. Results append to the output file, so an interrupted run resumes.
+  timed from the same warm slot state three times: baseline and redraft in alternating order,
+  then a repeat baseline that measures the engine's own run-to-run drift. Results append to the
+  output file, so an interrupted run resumes.
 - `judge` runs `calibrate` first and refuses to write verdicts if any hand-labeled case in
   `replay/calibration.jsonl` comes out wrong. The judge is any OpenAI-compatible endpoint with
   JSON-schema output (`--judge-key-env` names an environment variable holding its key). It must
@@ -25,5 +26,7 @@ uv run redraft-replay report --results results.jsonl --verdicts verdicts.jsonl
   `new_errors` (a redraft claim the sources contradict that the baseline does not make).
   Omissions are reported but do not fail it.
 - `report` prints the median speedup, median `reused`, pinned-line survival and the edit distance
-  between redraft and baseline, per document kind and overall, plus every failing claim.
-  Without calibrated verdicts it reports `judged: false` and no failure counts.
+  between redraft and baseline, per document kind, per mode and overall, plus every failing
+  claim. For each mode it gives a ship verdict: calibrated verdicts, at least 10 units, a median
+  speedup of at least 1.3x, no more failing pairs than the baseline-repeat control, and pinned
+  lines kept at least as often as baseline keeps them. Otherwise it lists the blockers.

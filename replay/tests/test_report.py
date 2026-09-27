@@ -1,9 +1,9 @@
 from replay.report import edit_distance, summarize
 
 
-def record(uid, kind, b_ms, r_ms, reused, b_text, r_text, pinned=()):
+def record(uid, kind, b_ms, r_ms, reused, b_text, r_text, pinned=(), mode="rederive"):
     return {
-        "unit_id": uid, "kind": "rederive", "document_kind": kind,
+        "unit_id": uid, "kind": mode, "document_kind": kind,
         "pinned": list(pinned),
         "baseline": {"text": b_text, "done": {"wall_ms": b_ms}},
         "redraft": {"text": r_text, "done": {"wall_ms": r_ms, "reused": reused}},
@@ -44,3 +44,39 @@ def test_unjudged_summary_reports_no_failure_counts():
     s = summarize([record("a", "plan", 1, 1, 0.1, "a", "a")], {}, judged=False)
     assert s["judged"] is False
     assert s["overall"]["failed"] is None
+
+
+def verdict(failed):
+    return {"failed": failed, "new_errors": [], "lost_facts": []}
+
+
+def test_a_mode_ships_only_when_speed_facts_and_pins_all_hold():
+    results = [
+        record("a", "plan", 300, 100, 0.8, "x", "x", pinned=["x"]),
+        record("b", "plan", 300, 150, 0.7, "y", "y"),
+        record("c", "reply", 100, 120, 0.2, "z", "q", mode="revise"),
+    ]
+    verdicts = {
+        "a": {**verdict(False), "control": verdict(False)},
+        "b": {**verdict(True), "control": verdict(True)},
+        "c": {**verdict(True), "control": verdict(False)},
+    }
+    s = summarize(results, verdicts, judged=True, min_units=1)
+    rederive = s["by_mode"]["rederive"]
+    assert rederive["failed"] == 1 and rederive["control_failed"] == 1
+    assert rederive["ships"] is True
+    revise = s["by_mode"]["revise"]
+    assert revise["ships"] is False
+    assert revise["blockers"] == ["median_speedup 0.833 < 1.3", "failed 1 > control_failed 0"]
+
+
+def test_nothing_ships_unjudged():
+    s = summarize([record("a", "plan", 300, 100, 0.8, "x", "x")], {}, judged=False)
+    assert s["by_mode"]["rederive"]["ships"] is False
+    assert "unjudged" in s["by_mode"]["rederive"]["blockers"]
+
+
+def test_too_few_units_block_shipping():
+    s = summarize([record("a", "plan", 300, 100, 0.8, "x", "x")], {"a": verdict(False)},
+                  judged=True)
+    assert "units 1 < 10" in s["by_mode"]["rederive"]["blockers"]
