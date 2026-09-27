@@ -1,5 +1,5 @@
 diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
-index af18dd1..690a88b 100644
+index af18dd1..4d6ae68 100644
 --- a/tools/server/server-context.cpp
 +++ b/tools/server/server-context.cpp
 @@ -13,6 +13,7 @@
@@ -10,7 +10,7 @@ index af18dd1..690a88b 100644
  #include "mtmd.h"
  #include "mtmd-helper.h"
  
-@@ -101,6 +102,13 @@ struct server_slot {
+@@ -101,6 +102,18 @@ struct server_slot {
      std::vector<std::pair<int32_t, int32_t>> prompt_probs_batch_idx; // (i_batch, target prompt pos)
      std::vector<completion_token_output> prompt_probs_output;
  
@@ -20,11 +20,16 @@ index af18dd1..690a88b 100644
 +    double  redraft_held_fraction = 0.0;
 +    int32_t redraft_divergences   = 0;
 +    std::unique_ptr<redraft::redraft_session> redraft_session;
++    // old_output index (or -1 for a serially decoded token) of every token processed
++    // since the last streamed chunk. A token ending in an incomplete UTF-8 sequence
++    // sends no chunk, so its source rides on the chunk that completes it.
++    std::vector<int32_t> redraft_src_pending;
++    bool redraft_prompt_timed = false;
 +
      bool has_next_token = true;
      bool has_new_line   = false;
      bool truncated      = false;
-@@ -208,6 +216,10 @@ struct server_slot {
+@@ -208,6 +221,12 @@ struct server_slot {
          generated_token_probs.clear();
          prompt_probs_batch_idx.clear();
          prompt_probs_output.clear();
@@ -32,10 +37,21 @@ index af18dd1..690a88b 100644
 +        redraft_held_fraction = 0.0;
 +        redraft_divergences = 0;
 +        redraft_session.reset();
++        redraft_src_pending.clear();
++        redraft_prompt_timed = false;
          json_schema = json();
  
          // clear speculative decoding stats
-@@ -1879,6 +1891,11 @@ private:
+@@ -1793,6 +1812,8 @@ private:
+         } else {
+             res->content = tkn.text_to_send;
+             res->tokens  = { tkn.tok };
++            res->redraft_src = std::move(slot.redraft_src_pending);
++            slot.redraft_src_pending.clear();
+         }
+ 
+         res->n_decoded             = slot.n_decoded;
+@@ -1879,6 +1900,11 @@ private:
          // populate res.prompt_probs_output (prompt_probs_tail)
          res->prompt_probs_output = std::move(slot.prompt_probs_output);
  
@@ -47,7 +63,7 @@ index af18dd1..690a88b 100644
          res->generation_params = slot.task->params; // copy the parameters
  
          queue_results.send(std::move(res));
-@@ -2458,6 +2475,12 @@ private:
+@@ -2458,6 +2484,12 @@ private:
                  continue;
              }
  
@@ -60,7 +76,7 @@ index af18dd1..690a88b 100644
              // check if we can batch this slot with the previous one
              if (!slot_batched) {
                  slot_batched = &slot;
-@@ -3173,13 +3196,21 @@ private:
+@@ -3173,13 +3205,21 @@ private:
              llama_set_embeddings(ctx_tgt, slot_batched->need_embd());
          }
  
@@ -84,7 +100,7 @@ index af18dd1..690a88b 100644
              n_empty_consecutive = 0;
          }
  
-@@ -3417,6 +3448,35 @@ private:
+@@ -3417,6 +3457,35 @@ private:
  
                  const int tok_idx = slot.i_batch - i;
  
@@ -120,7 +136,7 @@ index af18dd1..690a88b 100644
                  llama_token id = common_sampler_sample(slot.smpl.get(), slot.ctx_tgt, tok_idx);
  
                  slot.i_batch = -1;
-@@ -3576,6 +3636,54 @@ private:
+@@ -3576,6 +3645,68 @@ private:
              }
          }
  
@@ -135,15 +151,24 @@ index af18dd1..690a88b 100644
 +                continue;
 +            }
 +
++            // stamp the end of prompt processing before the first draft window, or
++            // prompt_ms would include that window's batched verify decode
++            if (!slot.redraft_prompt_timed) {
++                slot.redraft_prompt_timed = true;
++                slot.t_start_generation = ggml_time_us();
++                slot.t_prompt_processing = (slot.t_start_generation - slot.t_start_process_prompt) / 1e3;
++                metrics.on_prompt_eval(slot);
++            }
++
 +            std::vector<llama_token> delta = slot.redraft_session->step();
++            const auto & sources = slot.redraft_session->sources();
++            const size_t delta_base = sources.size() - delta.size();
 +
 +            bool stopped = false;
-+            for (llama_token tok : delta) {
-+                if (slot.n_decoded == 0) {
-+                    slot.t_start_generation = ggml_time_us();
-+                    slot.t_prompt_processing = (slot.t_start_generation - slot.t_start_process_prompt) / 1e3;
-+                    metrics.on_prompt_eval(slot);
-+                }
++            size_t n_processed = sources.size();
++            for (size_t di = 0; di < delta.size(); ++di) {
++                const llama_token tok = delta[di];
++                slot.redraft_src_pending.push_back(sources[delta_base + di]);
 +                slot.n_decoded += 1;
 +                slot.t_token_generation = std::max<int64_t>(1, ggml_time_us() - slot.t_start_generation) / 1e3;
 +
@@ -154,6 +179,7 @@ index af18dd1..690a88b 100644
 +
 +                if (!process_token(result, slot)) {
 +                    stopped = true;
++                    n_processed = delta_base + di + 1;
 +                    break;
 +                }
 +            }
@@ -161,8 +187,12 @@ index af18dd1..690a88b 100644
 +            if (stopped || slot.redraft_session->done()) {
 +                slot.redraft_held_fraction = slot.redraft_session->held_fraction();
 +                slot.redraft_divergences   = slot.redraft_session->divergences();
-+                slot.redraft_emitted.assign(slot.redraft_session->emitted().begin(),
-+                                            slot.redraft_session->emitted().end());
++                // a stop inside a window (an end-of-generation token outside the
++                // eos set, or the context limit) must not report the window's
++                // unprocessed tail, or the next refresh drafts from tokens the
++                // caller never received
++                const auto & emitted = slot.redraft_session->emitted();
++                slot.redraft_emitted.assign(emitted.begin(), emitted.begin() + n_processed);
 +                slot.redraft_session.reset();
 +
 +                slot.print_timings();
@@ -176,7 +206,7 @@ index af18dd1..690a88b 100644
      }
  
 diff --git a/tools/server/server-task.cpp b/tools/server/server-task.cpp
-index 089f1db..464c1b5 100644
+index 089f1db..8d1c211 100644
 --- a/tools/server/server-task.cpp
 +++ b/tools/server/server-task.cpp
 @@ -302,6 +302,18 @@ task_params server_task::params_from_json_cmpl(
@@ -210,8 +240,18 @@ index 089f1db..464c1b5 100644
      return response_fields.empty() ? res : json_get_nested_values(response_fields, res);
  }
  
+@@ -1467,6 +1484,9 @@ json server_task_result_cmpl_partial::to_json_non_oaicompat() {
+     if (!prob_output.probs.empty()) {
+         res["completion_probabilities"] = completion_token_output::probs_vector_to_json({prob_output}, post_sampling_probs);
+     }
++    if (!redraft_src.empty()) {
++        res["redraft_src"] = redraft_src;
++    }
+     return res;
+ }
+ 
 diff --git a/tools/server/server-task.h b/tools/server/server-task.h
-index 1420473..3690bef 100644
+index 1420473..b341757 100644
 --- a/tools/server/server-task.h
 +++ b/tools/server/server-task.h
 @@ -63,6 +63,20 @@ struct task_params {
@@ -248,3 +288,11 @@ index 1420473..3690bef 100644
      std::vector<std::string>  response_fields;
  
      task_params generation_params;
+@@ -414,6 +434,7 @@ struct server_task_result_cmpl_final : server_task_result {
+ struct server_task_result_cmpl_partial : server_task_result {
+     std::string  content;
+     llama_tokens tokens;
++    std::vector<int32_t> redraft_src; // per-token old_output index or -1, redraft slots only
+ 
+     int32_t n_decoded;
+     int32_t n_prompt_tokens;

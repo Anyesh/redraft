@@ -99,6 +99,22 @@ static bool run_one(uint64_t salt, const std::vector<token_id> &old_ids,
     ok = ok && stepper.result.emitted == bat.emitted &&
          stepper.result.events == bat.events &&
          stepper.result.divergences == bat.divergences && drained == bat.emitted;
+
+    // Source indices drive the streamed span events, so they must agree with the
+    // held/serial events and point at a matching old token, in increasing order.
+    const auto &src = stepper.sources;
+    ok = ok && src.size() == stepper.result.emitted.size();
+    int32_t last_held = -1;
+    for (size_t i = 0; ok && i < src.size(); ++i) {
+        bool held = stepper.result.events[i] == "held";
+        if (held != (src[i] >= 0)) {
+            ok = false;
+        } else if (held) {
+            ok = static_cast<size_t>(src[i]) < old_ids.size() &&
+                 old_ids[src[i]] == stepper.result.emitted[i] && src[i] > last_held;
+            last_held = src[i];
+        }
+    }
     return ok;
 }
 

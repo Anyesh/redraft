@@ -8,6 +8,7 @@
 // Parity with the reference core on the same inputs is the correctness contract.
 
 #include <algorithm>
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <unordered_set>
@@ -43,6 +44,10 @@ struct stab_stepper {
     std::unordered_set<token_id> eos_ids;
 
     stab_result result;
+    // Per emitted token: the old_ids index it was held from, or -1 when it was
+    // decoded serially. Parallel to result.emitted; kept outside stab_result so
+    // the reference core's result type stays untouched.
+    std::vector<int32_t> sources;
     std::optional<size_t> draft;
     size_t watermark = 0;
     bool done = false;
@@ -91,6 +96,7 @@ struct stab_stepper {
             }
             result.emitted.push_back(argmax);
             result.events.push_back("serial");
+            sources.push_back(-1);
             reanchor_after_serial();
             return tail(before);
         }
@@ -115,6 +121,7 @@ struct stab_stepper {
                 }
                 result.emitted.push_back(d);
                 result.events.push_back("held");
+                sources.push_back(static_cast<int32_t>(*draft));
                 ++*draft;
                 watermark = std::max(watermark, *draft);
                 if (*draft >= old_ids.size()) {
@@ -129,6 +136,7 @@ struct stab_stepper {
                 }
                 result.emitted.push_back(argmax);
                 result.events.push_back("serial");
+                sources.push_back(-1);
                 draft = std::nullopt;
                 reanchor_after_serial();
                 break;

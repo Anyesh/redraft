@@ -302,6 +302,7 @@ struct redraft_session {
 
     bool done() const { return stepper->done; }
     const std::vector<token_id> &emitted() const { return stepper->result.emitted; }
+    const std::vector<int32_t> &sources() const { return stepper->sources; }
     double held_fraction() const { return stepper->result.held_fraction(); }
     int divergences() const { return stepper->result.divergences; }
 

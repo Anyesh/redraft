@@ -65,6 +65,13 @@ sampler. Output flows through the standard `process_token` path, so SSE streamin
 adds `redraft_emitted` (the token ids actually emitted), `redraft_held_fraction`, and
 `redraft_divergences` alongside the usual `timings`.
 
+In stream mode every content chunk of a redraft request also carries `redraft_src`: one entry
+per token that chunk covers, holding the `old_output` index the token was held from, or `-1`
+when it was decoded serially after a divergence. A token that ends in an incomplete UTF-8
+sequence produces no chunk of its own, so its entry rides on the chunk that completes the
+character; a chunk can therefore carry several entries. Held indices strictly increase across
+the stream, which is what lets redraftd map held runs back onto the old text as span events.
+
 Cooperative scheduling is at window granularity: a redraft session yields the tick back to the
 scheduler between draft windows, so other slots make progress under `--parallel N`, but each
 window is still a dedicated `llama_decode` the session issues for itself.
