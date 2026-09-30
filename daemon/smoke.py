@@ -120,7 +120,8 @@ def report(label: str, events: list[tuple[str, dict]]) -> dict:
     print(
         f"{label}: mode={done['mode']} kind={done['kind']} reused={done['reused']:.2f} "
         f"reused_chars={done['reused_chars']:.2f} wall_ms={done['wall_ms']} "
-        f"prompt_ms={done['prompt_ms']} spans={len(spans)} "
+        f"prompt_ms={done['prompt_ms']} prompt_tokens={done['prompt_tokens']} "
+        f"total_tokens={done['total_tokens']} spans={len(spans)} "
         f"pinned_missing={done['pinned_missing']}"
     )
     return done
@@ -243,6 +244,7 @@ async def main(record: Path | None, down_url: str | None) -> None:
         )
 
         await queue_full(http, rec)
+        await purge(http, rec)
 
     if down_url:
         async with httpx.AsyncClient(base_url=down_url, timeout=30) as http:
@@ -271,6 +273,42 @@ async def queue_full(http: httpx.AsyncClient, rec: Recorder) -> None:
     rec.exchange("queue_full", {"method": "POST", "path": path, "json": {}}, resp)
     print("queue full:", resp.status_code, resp.json(), resp.headers.get("retry-after"))
     await asyncio.gather(*fillers)
+
+
+async def purge(http: httpx.AsyncClient, rec: Recorder) -> None:
+    """Runs last: the prefix delete drops every section the earlier steps made."""
+    base = f"/v1/sessions/{TENANT}/{DOC}"
+    ran = await http.get(f"{base}/filler-0")
+    assert ran.status_code == 200, ran.text
+
+    resp = await http.delete(f"{base}/overflow")
+    assert resp.json() == {"deleted": True, "slots_erased": 0, "slots_unerased": []}
+    rec.exchange(
+        "delete_section", {"method": "DELETE", "path": f"{base}/overflow"}, resp
+    )
+    resp = await http.delete(f"{base}/overflow")
+    assert resp.status_code == 200 and resp.json()["deleted"] is False, resp.text
+    rec.exchange(
+        "delete_section_absent", {"method": "DELETE", "path": f"{base}/overflow"}, resp
+    )
+
+    bad = f"/v1/sessions?prefix={TENANT}/{DOC}"
+    resp = await http.delete(bad)
+    assert resp.status_code == 400 and resp.json() == {"error": "bad_prefix"}
+    rec.exchange("delete_prefix_bad", {"method": "DELETE", "path": bad}, resp)
+
+    path = f"/v1/sessions?prefix={TENANT}/{DOC}/"
+    resp = await http.delete(path)
+    body = resp.json()
+    assert body["deleted"] >= 2 and body["slots_unerased"] == [], body
+    assert body["slots_erased"] >= 1, body
+    rec.exchange("delete_prefix", {"method": "DELETE", "path": path}, resp)
+    resp = await http.delete(path)
+    assert resp.json() == {"deleted": 0, "slots_erased": 0, "slots_unerased": []}
+    rec.exchange("delete_prefix_none", {"method": "DELETE", "path": path}, resp)
+    health = (await http.get("/healthz")).json()
+    assert health["slots"]["busy"] == 0 and health["sessions"] == 0, health
+    print("purge:", body)
 
 
 if __name__ == "__main__":

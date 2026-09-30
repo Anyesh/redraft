@@ -65,6 +65,8 @@ in a queue bounded by `--queue-depth` and `--queue-timeout-ms`. Sessions live in
 with a global cap and a per-tenant cap, so a restart loses them and callers re-open with `PUT`. Nothing is written to disk; a
 delete also erases (`POST /slots/{id}?action=erase`) every engine slot whose last section is gone, and
 reports slots it could not erase so the caller repeats the delete.
+Erasure needs llama-server started with `--slot-save-path <dir>`; without it every slot action is 501
+and each slot is reported in `slots_unerased`.
 
 ## Tests
 
