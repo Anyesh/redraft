@@ -28,7 +28,8 @@ def test_session_id_has_three_segments():
 
 
 @pytest.mark.parametrize(
-    "sid", ["acme/doc", "acme/doc/a/b", "acme//s", "acme/d/s p", "a/" + "x" * 129 + "/s"]
+    "sid",
+    ["acme/doc", "acme/doc/a/b", "acme//s", "acme/d/s p", "a/" + "x" * 129 + "/s"],
 )
 def test_bad_session_ids_are_rejected(sid):
     with pytest.raises(BadSessionId):

@@ -19,6 +19,19 @@ def parse_session_id(session_id: str) -> tuple[str, str, str]:
     return parts[0], parts[1], parts[2]
 
 
+def parse_prefix(prefix: str) -> tuple[str, ...]:
+    """A prefix names a tenant (`t/`) or a document (`t/d/`); the trailing slash
+    is required so `t/doc-1/` can never match `t/doc-10/`."""
+    parts = prefix.split("/")
+    if (
+        len(parts) not in (2, 3)
+        or parts[-1] != ""
+        or not all(SEGMENT.fullmatch(p) for p in parts[:-1])
+    ):
+        raise BadSessionId(prefix)
+    return tuple(parts[:-1])
+
+
 @dataclass
 class Source:
     name: str
@@ -80,6 +93,9 @@ class SessionStore:
 
     def delete(self, session_id: str) -> bool:
         return self._sessions.pop(session_id, None) is not None
+
+    def ids_with_prefix(self, prefix: str) -> list[str]:
+        return [sid for sid in self._sessions if sid.startswith(prefix)]
 
     def __len__(self) -> int:
         return len(self._sessions)

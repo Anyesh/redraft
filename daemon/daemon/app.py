@@ -29,6 +29,7 @@ from daemon.sessions import (
     Session,
     SessionStore,
     Source,
+    parse_prefix,
     parse_session_id,
 )
 from daemon.slots import Busy, SlotPool
@@ -179,6 +180,15 @@ def create_app(
     def lock_for(session_id: str) -> asyncio.Lock:
         return locks.setdefault(session_id, asyncio.Lock())
 
+    async def drop(session_id: str) -> bool:
+        lock = lock_for(session_id)
+        async with lock:
+            await runner.cancel(session_id)
+            deleted = store.delete(session_id)
+        if not lock.locked():
+            locks.pop(session_id, None)
+        return deleted
+
     def apply(session: Session, req: EditsRequest) -> None:
         if req.base_revision is not None and req.base_revision != session.revision:
             raise DaemonError(
@@ -277,17 +287,19 @@ def create_app(
     async def delete_section(
         tenant: str, document: str, section: str, request: Request
     ):
-        session_id = guard(request, tenant, document, section)
-        require(session_id)
-        lock = lock_for(session_id)
-        async with lock:
-            await runner.cancel(session_id)
-            deleted = store.delete(session_id)
-        if not lock.locked():
-            locks.pop(session_id, None)
-        if not deleted:
-            raise DaemonError(404, {"error": "unknown_session"})
-        return {"deleted": True}
+        return {"deleted": await drop(guard(request, tenant, document, section))}
+
+    @app.delete("/v1/sessions")
+    async def delete_prefix(request: Request, prefix: str = ""):
+        try:
+            tenant = parse_prefix(prefix)[0]
+            token_table.authorize(request.headers.get("authorization"), tenant)
+        except BadSessionId:
+            raise DaemonError(400, {"error": "bad_prefix"}) from None
+        except AuthError as exc:
+            raise DaemonError(exc.status, {"error": exc.code}) from None
+        dropped = [await drop(sid) for sid in store.ids_with_prefix(prefix)]
+        return {"deleted": sum(dropped)}
 
     @app.post("/v1/sessions/{tenant}/{document}/{section}/edits")
     async def edit_section(

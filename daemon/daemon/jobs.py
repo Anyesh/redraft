@@ -5,7 +5,9 @@ from collections.abc import Callable
 log = logging.getLogger("redraftd")
 
 
-def track(task: asyncio.Task, queue: asyncio.Queue, release: Callable[[], None]) -> None:
+def track(
+    task: asyncio.Task, queue: asyncio.Queue, release: Callable[[], None]
+) -> None:
     """Guarantee a refresh job frees its slot and ends its stream however it stops.
 
     This lives in a done-callback, not in the job's own finally, because a task

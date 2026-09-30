@@ -356,6 +356,123 @@ async def test_delete_removes_the_section(make):
     assert (await client.get(URL)).status_code == 404
 
 
+async def test_delete_of_an_absent_section_is_idempotent(make):
+    client, _ = await make()
+    await client.put(URL, json=open_body())
+    assert (await client.delete(URL)).json() == {"deleted": True}
+    again = await client.delete(URL)
+    assert again.status_code == 200
+    assert again.json() == {"deleted": False}
+
+
+async def open_sections(client, *ids):
+    for sid in ids:
+        assert (
+            await client.put(f"/v1/sessions/{sid}", json=open_body())
+        ).status_code == 200
+
+
+async def alive(client, *ids):
+    return [
+        sid
+        for sid in ids
+        if (await client.get(f"/v1/sessions/{sid}")).status_code == 200
+    ]
+
+
+async def test_delete_by_document_prefix_drops_only_that_document(make):
+    client, _ = await make()
+    ids = [
+        "acme/doc-1/a",
+        "acme/doc-1/b",
+        "acme/doc-10/a",
+        "acme/doc-2/a",
+        "globex/doc-1/a",
+    ]
+    await open_sections(client, *ids)
+    resp = await client.delete("/v1/sessions", params={"prefix": "acme/doc-1/"})
+    assert resp.json() == {"deleted": 2}
+    assert await alive(client, *ids) == ids[2:]
+
+
+async def test_delete_by_tenant_prefix_drops_every_section_of_the_tenant(make):
+    client, _ = await make()
+    ids = ["acme/doc-1/a", "acme/doc-2/a", "globex/doc-1/a"]
+    await open_sections(client, *ids)
+    resp = await client.delete("/v1/sessions", params={"prefix": "acme/"})
+    assert resp.json() == {"deleted": 2}
+    assert await alive(client, *ids) == ["globex/doc-1/a"]
+    again = await client.delete("/v1/sessions", params={"prefix": "acme/"})
+    assert again.json() == {"deleted": 0}
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {},
+        {"prefix": ""},
+        {"prefix": "acme"},
+        {"prefix": "acme/doc-1"},
+        {"prefix": "acme/doc-1/a/"},
+        {"prefix": "/"},
+        {"prefix": "acme//"},
+        {"prefix": "acme/d%20/"},
+    ],
+)
+async def test_bad_prefix_is_400_and_deletes_nothing(make, params):
+    client, _ = await make()
+    await open_sections(client, SID)
+    resp = await client.delete("/v1/sessions", params=params)
+    assert resp.status_code == 400
+    assert resp.json() == {"error": "bad_prefix"}
+    assert await alive(client, SID) == [SID]
+
+
+async def test_prefix_delete_is_scoped_to_the_callers_tenant(make):
+    client, _ = await make()
+    await open_sections(client, SID, "globex/doc-1/a")
+    scoped = {"Authorization": "Bearer acme-only"}
+    forbidden = await client.delete(
+        "/v1/sessions", params={"prefix": "globex/"}, headers=scoped
+    )
+    assert (forbidden.status_code, forbidden.json()) == (
+        403,
+        {"error": "forbidden_tenant"},
+    )
+    anonymous = await client.delete(
+        "/v1/sessions", params={"prefix": "acme/"}, headers={"Authorization": ""}
+    )
+    assert anonymous.status_code == 401
+    assert len(await alive(client, SID, "globex/doc-1/a")) == 2
+    own = await client.delete(
+        "/v1/sessions", params={"prefix": "acme/"}, headers=scoped
+    )
+    assert own.json() == {"deleted": 1}
+
+
+async def test_prefix_delete_mid_stream_frees_the_slot_and_ends_the_stream(make):
+    client, fake = await make()
+    await client.put(URL, json=open_body())
+    fake.completion_delay = 0.3
+    running = asyncio.create_task(client.post(f"{URL}/refresh", json={}))
+    await asyncio.sleep(0.1)
+    resp = await client.delete("/v1/sessions", params={"prefix": "acme/doc-1/"})
+    assert resp.json() == {"deleted": 1}
+    events = parse_sse((await running).content)
+    assert events[-1] == ("cancelled", {"reason": "superseded"})
+    assert (await client.get("/healthz")).json()["slots"]["busy"] == 0
+
+
+async def test_done_reports_prompt_and_total_tokens(make):
+    client, fake = await make()
+    await client.put(URL, json=open_body())
+    done = events_named(
+        parse_sse((await client.post(f"{URL}/refresh", json={})).content), "done"
+    )[0]
+    assert done["prompt_tokens"] > 0
+    assert done["total_tokens"] == done["prompt_tokens"] + done["tokens"]
+
+
 async def test_engine_without_the_patch_degrades_to_baseline(make):
     client, _ = await make(FakeLlamaServer(redraft_available=False))
     await client.put(URL, json=open_body(derived="- x"))
@@ -381,8 +498,15 @@ async def test_a_refused_refresh_applies_none_of_its_edits(make):
     resp = await client.post(
         f"{URL}/refresh",
         json={
-            "edits": [{"target": "source", "source": "transcript", "start": 0,
-                       "end": 1, "lines": ["y" * 200]}]
+            "edits": [
+                {
+                    "target": "source",
+                    "source": "transcript",
+                    "start": 0,
+                    "end": 1,
+                    "lines": ["y" * 200],
+                }
+            ]
         },
     )
     assert resp.status_code == 413

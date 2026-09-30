@@ -108,6 +108,8 @@ class Generation:
             "wall_ms": round(wall_ms, 1),
             "prompt_ms": final.get("timings", {}).get("prompt_ms"),
             "tokens": len(self.draft.ids),
+            "prompt_tokens": len(prep.prompt_ids),
+            "total_tokens": len(prep.prompt_ids) + len(self.draft.ids),
             "divergences": final.get("redraft_divergences", 0),
             "pinned_missing": missing_pinned(self.text, session.pinned),
         }
