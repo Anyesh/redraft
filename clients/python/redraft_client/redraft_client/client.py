@@ -206,6 +206,10 @@ class RedraftClient:
         resp.raise_for_status()
         return resp.json()["prompt"]
 
+    async def erase_slot(self, slot: int) -> None:
+        resp = await self.http.post(f"/slots/{slot}", params={"action": "erase"})
+        resp.raise_for_status()
+
     async def eos_ids(self) -> set[int]:
         resp = await self.http.get("/props", params={"model": self.model})
         resp.raise_for_status()

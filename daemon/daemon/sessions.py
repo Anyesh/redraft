@@ -97,6 +97,9 @@ class SessionStore:
     def ids_with_prefix(self, prefix: str) -> list[str]:
         return [sid for sid in self._sessions if sid.startswith(prefix)]
 
+    def __contains__(self, session_id: str) -> bool:
+        return session_id in self._sessions
+
     def __len__(self) -> int:
         return len(self._sessions)
 

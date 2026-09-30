@@ -133,6 +133,9 @@ def create_app(
     # one lock per open section; a lock is created only for sections that exist
     # (or are being opened) so unknown ids cannot grow this map
     locks: dict[str, asyncio.Lock] = {}
+    # the section whose prompt the engine slot's KV cache holds, set when a refresh
+    # takes the slot and cleared only once the slot has been erased
+    slot_owner: dict[int, str] = {}
     state: dict[str, RedraftClient] = {}
 
     @asynccontextmanager
@@ -188,6 +191,28 @@ def create_app(
         if not lock.locked():
             locks.pop(session_id, None)
         return deleted
+
+    async def erase_orphaned_slots() -> dict:
+        """Wipe every slot cache whose section no longer exists. Failures stay in
+        slot_owner, so the next delete retries them."""
+        erased, unerased = 0, []
+        for slot, owner in list(slot_owner.items()):
+            if owner in store:
+                continue
+            if not await pool.claim(slot, settings.queue_timeout_ms / 1000):
+                unerased.append(slot)
+                continue
+            try:
+                if slot_owner.get(slot) not in store:
+                    await state["client"].erase_slot(slot)
+                    slot_owner.pop(slot, None)
+                    erased += 1
+            except httpx.HTTPError as exc:
+                log.warning("erase of slot %s failed: %r", slot, exc)
+                unerased.append(slot)
+            finally:
+                pool.release(slot)
+        return {"slots_erased": erased, "slots_unerased": unerased}
 
     def apply(session: Session, req: EditsRequest) -> None:
         if req.base_revision is not None and req.base_revision != session.revision:
@@ -287,7 +312,8 @@ def create_app(
     async def delete_section(
         tenant: str, document: str, section: str, request: Request
     ):
-        return {"deleted": await drop(guard(request, tenant, document, section))}
+        deleted = await drop(guard(request, tenant, document, section))
+        return {"deleted": deleted, **await erase_orphaned_slots()}
 
     @app.delete("/v1/sessions")
     async def delete_prefix(request: Request, prefix: str = ""):
@@ -299,7 +325,7 @@ def create_app(
         except AuthError as exc:
             raise DaemonError(exc.status, {"error": exc.code}) from None
         dropped = [await drop(sid) for sid in store.ids_with_prefix(prefix)]
-        return {"deleted": sum(dropped)}
+        return {"deleted": sum(dropped), **await erase_orphaned_slots()}
 
     @app.post("/v1/sessions/{tenant}/{document}/{section}/edits")
     async def edit_section(
@@ -358,6 +384,7 @@ def create_app(
             queued_ms = round((time.perf_counter() - queued_at) * 1000, 1)
             slot_reused = session.slot == slot
             session.slot = slot
+            slot_owner[slot] = session_id
             store.put(session)
             queue: asyncio.Queue = asyncio.Queue()
             generation = Generation(client, engine, session, prepared, slot)

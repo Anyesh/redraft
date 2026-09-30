@@ -29,8 +29,8 @@ matching `[A-Za-z0-9._~:@+-]{1,128}`. Every route except `/healthz` needs
 | `GET /healthz` | `{status: ok/degraded/down, version, template_version, model: {name, resident, redraft}, slots: {total, busy, queued}, sessions}`; 503 when down |
 | `PUT .../{section}` | open or replace: `{instruction, sources: [{name, text}], derived?, pinned?, max_tokens?}`; a given `derived` becomes the next refresh's draft |
 | `GET .../{section}` | current state and `revision` |
-| `DELETE .../{section}` | drop it, cancelling any in-flight refresh; idempotent, `{deleted: true/false}` |
-| `DELETE /v1/sessions?prefix=<tenant>/` or `<tenant>/<document>/` | drop every matching section; `{deleted: n}`, `400 bad_prefix` on a malformed prefix |
+| `DELETE .../{section}` | drop it, cancelling any in-flight refresh; idempotent, `{deleted, slots_erased, slots_unerased}` |
+| `DELETE /v1/sessions?prefix=<tenant>/` or `<tenant>/<document>/` | drop every matching section; `{deleted: n, slots_erased, slots_unerased}`, `400 bad_prefix` on a malformed prefix |
 | `POST .../{section}/edits` | `{base_revision?, edits, pinned?}`, applied without generating |
 | `POST .../{section}/refresh` | `{base_revision?, edits?, sources?, instruction?, pinned?, baseline?}`, streams SSE |
 
@@ -62,9 +62,9 @@ statuses.
 A section returns to the engine slot that served it last when that slot is free, which keeps the
 prompt prefix cached; otherwise it takes any free slot. With every slot busy, requests wait FIFO
 in a queue bounded by `--queue-depth` and `--queue-timeout-ms`. Sessions live in memory only, LRU
-with a global cap and a per-tenant cap, so a restart loses them and callers re-open with `PUT`. Nothing is written to disk; the
-engine's per-slot KV cache keeps the last prompt it served until another overwrites it, and a
-delete does not wipe it.
+with a global cap and a per-tenant cap, so a restart loses them and callers re-open with `PUT`. Nothing is written to disk; a
+delete also erases (`POST /slots/{id}?action=erase`) every engine slot whose last section is gone, and
+reports slots it could not erase so the caller repeats the delete.
 
 ## Tests
 

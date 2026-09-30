@@ -34,6 +34,8 @@ class FakeLlamaServer:
         self.completion_delay = 0.0
         self.completion_bodies: list[dict] = []
         self.templates: list[str] = []
+        self.erased_slots: list[int] = []
+        self.erase_status = 200
 
     async def handler(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -51,6 +53,11 @@ class FakeLlamaServer:
                     "default_generation_settings": {"n_ctx": self.n_ctx},
                 },
             )
+        if path.startswith("/slots/"):
+            assert request.url.params.get("action") == "erase"
+            if self.erase_status == 200:
+                self.erased_slots.append(int(path.rsplit("/", 1)[1]))
+            return httpx.Response(self.erase_status, json={})
         body = json.loads(request.content)
         if path == "/apply-template":
             prompt = body["messages"][0]["content"]

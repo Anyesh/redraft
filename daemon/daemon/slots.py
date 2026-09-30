@@ -24,6 +24,7 @@ class SlotPool:
         self.queue_timeout_s = queue_timeout_s
         self._free: list[int] = list(range(total))
         self._waiters: deque[asyncio.Future[int]] = deque()
+        self._claims: dict[int, deque[asyncio.Future[int]]] = {}
 
     async def acquire(self, preferred: int | None) -> int:
         if self._free:
@@ -43,7 +44,31 @@ class SlotPool:
             self._abandon(fut)
             raise
 
+    async def claim(self, slot: int, timeout_s: float) -> bool:
+        """Take one named slot, ahead of queued refreshes, so maintenance on its
+        cache never overlaps a generation. False if it stays busy past the timeout."""
+        if slot in self._free:
+            self._free.remove(slot)
+            return True
+        fut: asyncio.Future[int] = asyncio.get_running_loop().create_future()
+        self._claims.setdefault(slot, deque()).append(fut)
+        try:
+            await asyncio.wait_for(asyncio.shield(fut), timeout_s)
+        except TimeoutError:
+            self._abandon_claim(slot, fut)
+            return False
+        except asyncio.CancelledError:
+            self._abandon_claim(slot, fut)
+            raise
+        return True
+
     def release(self, slot: int) -> None:
+        claims = self._claims.get(slot, ())
+        while claims:
+            fut = claims.popleft()
+            if not fut.done():
+                fut.set_result(slot)
+                return
         while self._waiters:
             fut = self._waiters.popleft()
             if not fut.done():
@@ -63,6 +88,14 @@ class SlotPool:
         # the pool, or it is lost for the life of the daemon.
         with contextlib.suppress(ValueError):
             self._waiters.remove(fut)
+        if fut.done() and not fut.cancelled():
+            self.release(fut.result())
+        else:
+            fut.cancel()
+
+    def _abandon_claim(self, slot: int, fut: asyncio.Future[int]) -> None:
+        with contextlib.suppress(ValueError):
+            self._claims.get(slot, deque()).remove(fut)
         if fut.done() and not fut.cancelled():
             self.release(fut.result())
         else:

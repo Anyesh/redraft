@@ -340,9 +340,7 @@ async def test_streamed_completions_never_reuse_their_connection():
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen["connection"] = request.headers.get("connection")
-        return httpx.Response(
-            200, content=b'data: {"content": "", "stop": true}\n\n'
-        )
+        return httpx.Response(200, content=b'data: {"content": "", "stop": true}\n\n')
 
     client = _client_with_handler(handler)
     [e async for e in client.stream_baseline([1], 1)]

@@ -352,17 +352,17 @@ async def test_newer_refresh_supersedes_the_running_one(make):
 async def test_delete_removes_the_section(make):
     client, _ = await make()
     await client.put(URL, json=open_body())
-    assert (await client.delete(URL)).json() == {"deleted": True}
+    assert (await client.delete(URL)).json()["deleted"] is True
     assert (await client.get(URL)).status_code == 404
 
 
 async def test_delete_of_an_absent_section_is_idempotent(make):
     client, _ = await make()
     await client.put(URL, json=open_body())
-    assert (await client.delete(URL)).json() == {"deleted": True}
+    assert (await client.delete(URL)).json()["deleted"] is True
     again = await client.delete(URL)
     assert again.status_code == 200
-    assert again.json() == {"deleted": False}
+    assert again.json()["deleted"] is False
 
 
 async def open_sections(client, *ids):
@@ -391,7 +391,7 @@ async def test_delete_by_document_prefix_drops_only_that_document(make):
     ]
     await open_sections(client, *ids)
     resp = await client.delete("/v1/sessions", params={"prefix": "acme/doc-1/"})
-    assert resp.json() == {"deleted": 2}
+    assert resp.json()["deleted"] == 2
     assert await alive(client, *ids) == ids[2:]
 
 
@@ -400,10 +400,10 @@ async def test_delete_by_tenant_prefix_drops_every_section_of_the_tenant(make):
     ids = ["acme/doc-1/a", "acme/doc-2/a", "globex/doc-1/a"]
     await open_sections(client, *ids)
     resp = await client.delete("/v1/sessions", params={"prefix": "acme/"})
-    assert resp.json() == {"deleted": 2}
+    assert resp.json()["deleted"] == 2
     assert await alive(client, *ids) == ["globex/doc-1/a"]
     again = await client.delete("/v1/sessions", params={"prefix": "acme/"})
-    assert again.json() == {"deleted": 0}
+    assert again.json()["deleted"] == 0
 
 
 @pytest.mark.parametrize(
@@ -447,7 +447,7 @@ async def test_prefix_delete_is_scoped_to_the_callers_tenant(make):
     own = await client.delete(
         "/v1/sessions", params={"prefix": "acme/"}, headers=scoped
     )
-    assert own.json() == {"deleted": 1}
+    assert own.json()["deleted"] == 1
 
 
 async def test_prefix_delete_mid_stream_frees_the_slot_and_ends_the_stream(make):
@@ -457,7 +457,7 @@ async def test_prefix_delete_mid_stream_frees_the_slot_and_ends_the_stream(make)
     running = asyncio.create_task(client.post(f"{URL}/refresh", json={}))
     await asyncio.sleep(0.1)
     resp = await client.delete("/v1/sessions", params={"prefix": "acme/doc-1/"})
-    assert resp.json() == {"deleted": 1}
+    assert resp.json()["deleted"] == 1
     events = parse_sse((await running).content)
     assert events[-1] == ("cancelled", {"reason": "superseded"})
     assert (await client.get("/healthz")).json()["slots"]["busy"] == 0
@@ -471,6 +471,80 @@ async def test_done_reports_prompt_and_total_tokens(make):
     )[0]
     assert done["prompt_tokens"] > 0
     assert done["total_tokens"] == done["prompt_tokens"] + done["tokens"]
+
+
+async def refresh_once(client, sid):
+    resp = await client.post(f"/v1/sessions/{sid}/refresh", json={})
+    return events_named(parse_sse(resp.content), "done")[0]["slot"]
+
+
+async def test_delete_erases_the_slot_that_last_served_the_section(make):
+    client, fake = await make()
+    await client.put(URL, json=open_body())
+    slot = await refresh_once(client, SID)
+    resp = await client.delete(URL)
+    assert resp.json() == {"deleted": True, "slots_erased": 1, "slots_unerased": []}
+    assert fake.erased_slots == [slot]
+    assert (await client.get("/healthz")).json()["slots"]["busy"] == 0
+
+
+async def test_delete_of_a_section_that_never_ran_erases_nothing(make):
+    client, fake = await make()
+    await client.put(URL, json=open_body())
+    resp = await client.delete(URL)
+    assert resp.json()["slots_erased"] == 0
+    assert fake.erased_slots == []
+
+
+async def test_slot_is_kept_while_a_live_section_was_the_last_to_use_it(make):
+    client, fake = await make(slots=1)
+    other = "acme/doc-1/other"
+    await open_sections(client, SID, other)
+    await refresh_once(client, SID)
+    await refresh_once(client, other)
+    assert (await client.delete(URL)).json()["slots_erased"] == 0
+    assert fake.erased_slots == []
+    assert (await client.delete(f"/v1/sessions/{other}")).json()["slots_erased"] == 1
+    assert fake.erased_slots == [0]
+
+
+async def test_prefix_delete_erases_every_slot_of_the_dropped_sections(make):
+    client, fake = await make()
+    ids = ["acme/doc-1/a", "acme/doc-1/b"]
+    await open_sections(client, *ids)
+    used = {await refresh_once(client, sid) for sid in ids}
+    assert len(used) == 2
+    resp = await client.delete("/v1/sessions", params={"prefix": "acme/"})
+    assert resp.json() == {"deleted": 2, "slots_erased": 2, "slots_unerased": []}
+    assert set(fake.erased_slots) == used
+
+
+async def test_delete_mid_stream_erases_after_the_cancelled_refresh_lets_go(make):
+    client, fake = await make(slots=1)
+    await client.put(URL, json=open_body())
+    fake.completion_delay = 0.3
+    running = asyncio.create_task(client.post(f"{URL}/refresh", json={}))
+    await asyncio.sleep(0.1)
+    resp = await client.delete(URL)
+    assert resp.json()["slots_erased"] == 1
+    assert fake.erased_slots == [0]
+    await running
+    assert (await client.get("/healthz")).json()["slots"]["busy"] == 0
+
+
+async def test_failed_erase_is_reported_and_retried_by_the_next_delete(make):
+    client, fake = await make()
+    await client.put(URL, json=open_body())
+    slot = await refresh_once(client, SID)
+    fake.erase_status = 500
+    resp = await client.delete(URL)
+    assert resp.status_code == 200
+    assert resp.json() == {"deleted": True, "slots_erased": 0, "slots_unerased": [slot]}
+    assert (await client.get("/healthz")).json()["slots"]["busy"] == 0
+    fake.erase_status = 200
+    retry = await client.delete(URL)
+    assert retry.json() == {"deleted": False, "slots_erased": 1, "slots_unerased": []}
+    assert fake.erased_slots == [slot]
 
 
 async def test_engine_without_the_patch_degrades_to_baseline(make):
