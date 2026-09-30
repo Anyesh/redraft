@@ -13,6 +13,7 @@ from replay.calibration import calibrate, load_cases
 from replay.judge import Judge, JudgeError, fact_diff
 from replay.report import summarize
 from replay.run import Redraftd, run_bundle
+from replay.synth import build_bundle
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -120,6 +121,11 @@ def main() -> None:
             p.add_argument("--results", required=True)
             p.add_argument("--out", required=True)
 
+    synth = sub.add_parser("synth", help="write a synthetic section-11 bundle")
+    synth.add_argument("--out", required=True)
+    synth.add_argument("--per-kind", type=int, default=13)
+    synth.add_argument("--seed", type=int, default=0)
+
     report = sub.add_parser("report")
     report.add_argument("--results", required=True)
     report.add_argument("--verdicts")
@@ -127,6 +133,9 @@ def main() -> None:
     args = parser.parse_args()
     if args.command == "report":
         sys.exit(cmd_report(args))
+    if args.command == "synth":
+        build_bundle(Path(args.out), args.per_kind, args.seed)
+        sys.exit(0)
     handler = {"run": cmd_run, "calibrate": cmd_calibrate, "judge": cmd_judge}[
         args.command
     ]
