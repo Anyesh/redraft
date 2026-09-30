@@ -3,7 +3,7 @@ import json
 import httpx
 
 from replay.bundle import Unit
-from replay.run import Redraftd, ReplayError, run_bundle, run_unit
+from replay.run import PERSON_EDIT, Redraftd, ReplayError, run_bundle, run_unit
 
 
 class FakeRedraftd:
@@ -79,7 +79,7 @@ async def test_revise_units_send_the_persons_edit_as_line_ranges():
     record = await run_unit(fake.client(), unit, redraft_first=True)
     body = timed_bodies(fake)[0]
     assert body["edits"] == [{"target": "derived", "start": 1, "end": 2, "lines": ["B"]}]
-    assert record["sources"] == [["t", "x"]]
+    assert record["sources"] == [["t", "x"], [PERSON_EDIT, "B"]]
 
 
 async def test_a_stream_without_done_is_an_error():

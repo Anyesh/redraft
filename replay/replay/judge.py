@@ -8,7 +8,7 @@ import httpx
 
 from replay.bundle import Sources
 
-FACT_DIFF_VERSION = 1
+FACT_DIFF_VERSION = 2
 
 EXTRACT_SYSTEM = (
     "You check generated documents against their sources. List every atomic factual "
@@ -17,7 +17,9 @@ EXTRACT_SYSTEM = (
     "and ignore headings and wording. Give each claim a verdict: 'supported' if the "
     "sources state or directly imply it, 'contradicted' if the sources state something "
     "incompatible with it, 'unverifiable' if the sources say nothing either way. Quote the "
-    "source line the verdict rests on as evidence, or leave it empty."
+    "source line the verdict rests on as evidence, or leave it empty. A source named "
+    "'person edit' holds lines a person wrote by hand; it is authoritative and wins over "
+    "every other source where they differ, so a claim that contradicts it is contradicted."
 )
 MATCH_SYSTEM = (
     "For each numbered CLAIM, read the TEXT and label it: 'consistent' if the text states "

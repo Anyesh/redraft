@@ -25,6 +25,18 @@ def parse_sse(body: str) -> list[tuple[str, dict]]:
     return events
 
 
+PERSON_EDIT = "person edit"
+
+
+def person_edit_source(unit: Unit) -> Sources:
+    lines = [
+        line
+        for edit in line_edits(unit.derived_before, unit.derived_after)
+        for line in edit["lines"]
+    ]
+    return [(PERSON_EDIT, "\n".join(lines))] if lines else []
+
+
 def as_sources(sources: Sources) -> list[dict]:
     return [{"name": name, "text": text} for name, text in sources]
 
@@ -70,7 +82,7 @@ async def run_unit(client: Redraftd, unit: Unit, redraft_first: bool) -> dict:
     }
     if unit.kind == "revise":
         change = {"edits": line_edits(unit.derived_before, unit.derived_after)}
-        judged_sources = unit.sources_before
+        judged_sources = [*unit.sources_before, *person_edit_source(unit)]
     else:
         change = {"sources": as_sources(unit.sources_after)}
         judged_sources = unit.sources_after
