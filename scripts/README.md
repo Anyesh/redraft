@@ -2,7 +2,7 @@
 
 Run redraftd in front of a patched llama-server on a CPU-only machine, with a 3B model. All scripts take `WORK`, a scratch directory that holds the engine checkout, model, tokens, pid files and logs. `REPO` defaults to this checkout.
 
-Host-specific GPU-box launch scripts (the 14B stack) live in the private calcifer-lab repo, not here.
+Host-specific GPU-box launch scripts are kept outside this repo.
 
 ## Build
 
