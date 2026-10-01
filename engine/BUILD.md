@@ -28,6 +28,50 @@ cmake --build build --config Release -t llama-server -j"$(nproc)"
 For a CPU-only build, drop `-DGGML_CUDA=ON` and the architecture flag. See llama.cpp's own build
 docs for other backends (Metal, ROCm, Vulkan).
 
+### Fetch the source
+
+```bash
+git init llama.cpp && cd llama.cpp
+git remote add origin https://github.com/ggml-org/llama.cpp.git
+git fetch --depth 1 origin 9777256c3130fa3201327bfab44bae187f7caea2
+git checkout FETCH_HEAD
+```
+
+then apply the patches as above, with paths relative to this repo's `engine/`. For a CPU-only
+build and the 3B test model in one step, `scripts/build-cpu-engine.sh` does all of this (see
+`scripts/README.md`), and `scripts/check-engine-patches.sh` only verifies that both patches
+apply to the pinned commit, which is the check to run after editing either patch.
+
+## Run
+
+```bash
+build/bin/llama-server -m model.gguf --host 127.0.0.1 --port 8080 \
+    --parallel 2 -c 8192 --slot-save-path ./slots > llama-server.log 2>&1 &
+echo $! > llama-server.pid
+```
+
+- `--parallel N` sets the slot count; redraftd's `--slots` must equal it. `-c` is the context
+  shared across slots, so each slot gets `-c / N`.
+- `--slot-save-path <dir>` is required for slot erasure (`POST /slots/{id}?action=erase`); without it
+  every slot action answers 501 and redraftd reports each slot as `slots_unerased`.
+- Add `-ngl 99` for a CUDA build to offload all layers. Any GGUF that stock llama.cpp serves
+  works; the 3B Qwen2.5 Instruct Q4_K_M from Hugging Face is the small test model.
+
+Status is `curl http://127.0.0.1:8080/health` (200 once the model is loaded, 503 while loading),
+logs are whatever stderr was redirected to, and `kill "$(cat llama-server.pid)"` stops it, which
+also drops every slot cache. redraftd's `/healthz` reports `degraded` when the server is not this
+patched build. The patches themselves have no automated test beyond redraftd's `smoke.py` and the
+`bench/` parity tests; run `daemon/smoke.py` against a fresh build (`daemon/README.md`).
+
+Build problems:
+
+- `git apply` fails: the checkout is not the pinned commit, or `prompt-probs` was not applied
+  before `redraft`; run `scripts/check-engine-patches.sh`.
+- Compile error about a missing `stabilize.hpp`, `batched_stabilize.hpp` or `redraft_stabilize.hpp`:
+  the three headers were not copied into `tools/server/`.
+- CUDA build picks the wrong architecture: pass `-DCMAKE_CUDA_ARCHITECTURES=<cc>` for your card
+  (`nvidia-smi --query-gpu=compute_cap --format=csv`, with the dot removed).
+
 ## The `prompt_probs_tail` contract
 
 `/completion` gains a new integer request field, `prompt_probs_tail` (default 0 = off). For a prompt of `M` tokens, setting it to `N` adds a `prompt_probabilities` array to the JSON response with (at most) `N` entries, reusing the exact same top-K/softmax/logprob JSON shape as the pre-existing `completion_probabilities` field (`id`, `token`, `bytes`, `logprob`, `top_logprobs`), so any code already parsing `completion_probabilities` can parse `prompt_probabilities` unchanged.
