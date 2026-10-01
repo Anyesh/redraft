@@ -16,6 +16,12 @@ Fetches llama.cpp at the pinned commit, applies the two patches from `engine/`, 
 
 Starts llama-server on 127.0.0.1:18080 (2 slots, 8192 context) and redraftd on 127.0.0.1:18787 (2 slots, queue depth 1), then prints `/healthz`. The first run generates a bearer token in `$WORK/token` and its hash in `$WORK/tokens`.
 
+## Check the engine patches
+
+    WORK=~/redraft-cpu scripts/check-engine-patches.sh
+
+Fetches the pinned llama.cpp commit into a throwaway checkout and verifies that both patches apply in order. Needs network access; run it after editing either patch.
+
 ## Status
 
     WORK=~/redraft-cpu scripts/status-cpu-stack.sh
