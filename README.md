@@ -22,6 +22,14 @@ Full writeup: [`paper/redraft-preprint.pdf`](paper/redraft-preprint.pdf).
   - `bench/cases/` the annotated 36-case edit suite (expect/forbid checks, six fact-flip
     canaries).
   - `bench/results/` the measurement CSVs and token dumps behind every number in the paper.
+- `daemon/` redraftd, the session daemon in front of the patched server: tenant-scoped section
+  sessions, span events, slot management. Install, configuration, operation and troubleshooting
+  are in `daemon/README.md`.
+- `clients/python/` `redraft_client`, the Python client library the daemon depends on.
+- `replay/` `redraft-replay`, which replays recorded edits through redraftd and judges redraft
+  against plain generation fact by fact (`replay/README.md`).
+- `scripts/` build, start, stop and status scripts for a CPU-only stack, plus a check that the
+  engine patches apply (`scripts/README.md`).
 - `demo/` interactive demo: a reactive document editor racing redraft against regeneration,
   over a FastAPI app in front of the patched server.
 
@@ -35,6 +43,25 @@ uv run python -m bench.report_m7 --csv results/m7_wall_14b.csv
 ```
 
 The server patches apply to llama.cpp commit `9777256c` (b9354); see `engine/BUILD.md`.
+
+## Run and operate
+
+The shortest path to a running stack on a CPU-only machine is `scripts/README.md`: build the
+patched engine, start it with redraftd, check `/healthz`, read the logs, stop. For your own model
+and GPU, build per `engine/BUILD.md` and start the daemon per `daemon/README.md`, which also lists
+every setting, the token file format and a troubleshooting table.
+
+## Tests
+
+| Tier | Needs | Command |
+|---|---|---|
+| `bench/` loop, acceptance rules, cost model, parity fuzz | nothing | `cd bench && uv run pytest` |
+| `daemon/` redraftd against a fake engine | nothing | `cd daemon && uv run pytest` |
+| `replay/` bundle, judge, report | nothing | `cd replay && uv run pytest` |
+| `demo/` FastAPI app | nothing | `cd demo && uv run pytest` |
+| engine patches apply to the pinned commit | network | `WORK=<scratch dir> scripts/check-engine-patches.sh` |
+| live daemon plus real engine | running stack, token | `cd daemon && uv run python smoke.py` (`daemon/README.md`) |
+| wall-clock and acceptance measurements | patched server, GPU | `bench/bench/measure_wall.py` (see Reproduce) |
 
 ## History
 
