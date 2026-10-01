@@ -30,3 +30,24 @@ uv run redraft-replay report --results results.jsonl --verdicts verdicts.jsonl
   claim. For each mode it gives a ship verdict: calibrated verdicts, at least 10 units, a median
   speedup of at least 1.3x, no more failing pairs than the baseline-repeat control, and pinned
   lines kept at least as often as baseline keeps them. Otherwise it lists the blockers.
+
+## Install and test
+
+From `replay/`, `uv sync` installs the package and `uv run pytest` runs the tests offline against
+fakes. `uv run redraft-replay synth --help` builds a synthetic bundle for a dry run.
+
+## Judge endpoint
+
+`judge` and `calibrate` talk to an OpenAI-compatible chat endpoint that supports JSON-schema
+structured output, for example a second `llama-server` started with a different model on its own
+port. Run it only after the generation phase has finished and the redraft engine is stopped, so the
+two models do not share one GPU. `--judge-key-env NAME` names the environment variable that holds an API key if
+the endpoint needs one. A judge that fails calibration (`replay/calibration.jsonl`) stops the run
+before any verdict is written.
+
+## Troubleshooting
+
+- `401` or `403` from `run`: `REDRAFTD_TOKEN` is unset, or the token's scope does not cover the
+  tenant the bundle uses (see Tokens file in `daemon/README.md`).
+- `run` stopped midway: rerun the same command, results append and finished units are skipped.
+- `judge` refuses to write verdicts: calibration failed; try a larger judge model.
