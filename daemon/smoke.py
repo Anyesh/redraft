@@ -25,7 +25,7 @@ from pathlib import Path
 
 import httpx
 
-TENANT, DOC = "acme", "weekly-sync"
+TENANT, DOC = os.environ.get("REDRAFTD_TENANT", "acme"), "weekly-sync"
 TRANSCRIPT = """Dana: Let's start with the beta. Are we still on for Friday?
 Priya: Yes, the release checklist is done except the rollback drill.
 Marco: The login bug is the last blocker. I can fix it by Wednesday.
