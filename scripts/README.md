@@ -30,6 +30,8 @@ Fetches the pinned llama.cpp commit into a throwaway checkout and verifies that 
 
     WORK=~/redraft-cpu scripts/stop-cpu-stack.sh
 
+Stops redraftd first, then llama-server. Each gets SIGTERM, then SIGKILL after `GRACE` seconds (default 15); the script prints what it stopped and exits non-zero if a process survives.
+
 ## Logs
 
 `$WORK/llama-server.log` and `$WORK/redraftd.log`.
